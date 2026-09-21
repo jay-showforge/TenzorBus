@@ -21,6 +21,8 @@
 //! --target x86_64-unknown-linux-gnu --test tsan_threads`. A clean run prints no
 //! `WARNING: ThreadSanitizer` lines; the script fails the build if any appear.
 
+#[cfg(feature = "tsan-positive-control")]
+use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
@@ -28,6 +30,72 @@ use std::time::Duration;
 use tenzorbus::{Backpressure, DType, Ring, RingOptions, TensorView};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+// A deliberately unsynchronised cell used only by the sanitizer positive
+// control. It is feature-gated out of every normal build and exists to prove
+// that TSan is active and that the suppressions do not hide TenzorBus frames.
+#[cfg(feature = "tsan-positive-control")]
+struct DeliberateRace(UnsafeCell<u64>);
+
+#[cfg(feature = "tsan-positive-control")]
+unsafe impl Sync for DeliberateRace {}
+
+#[cfg(feature = "tsan-positive-control")]
+#[inline(never)]
+fn deliberately_racy_write(cell: &DeliberateRace, value: u64) {
+    // SAFETY: this is intentionally unsynchronised and is compiled only for
+    // the TSan positive-control build.
+    unsafe { std::ptr::write_volatile(cell.0.get(), value) };
+}
+
+#[cfg(feature = "tsan-positive-control")]
+#[inline(never)]
+fn deliberately_racy_read(cell: &DeliberateRace) -> u64 {
+    // SAFETY: this is intentionally unsynchronised and is compiled only for
+    // the TSan positive-control build.
+    unsafe { std::ptr::read_volatile(cell.0.get()) }
+}
+
+#[cfg(feature = "tsan-positive-control")]
+#[test]
+fn tsan_positive_control_detects_an_explicit_race() {
+    let cell = Arc::new(DeliberateRace(UnsafeCell::new(0)));
+    let start = Arc::new(Barrier::new(3));
+
+    let writer = {
+        let cell = Arc::clone(&cell);
+        let start = Arc::clone(&start);
+        std::thread::spawn(move || {
+            start.wait();
+            for value in 0..200_000u64 {
+                deliberately_racy_write(&cell, value);
+                if value % 256 == 0 {
+                    std::thread::yield_now();
+                }
+            }
+        })
+    };
+
+    let reader = {
+        let cell = Arc::clone(&cell);
+        let start = Arc::clone(&start);
+        std::thread::spawn(move || {
+            start.wait();
+            let mut observed = 0u64;
+            for iteration in 0..200_000u64 {
+                observed ^= deliberately_racy_read(&cell);
+                if iteration % 256 == 0 {
+                    std::thread::yield_now();
+                }
+            }
+            std::hint::black_box(observed)
+        })
+    };
+
+    start.wait();
+    writer.join().expect("positive-control writer");
+    std::hint::black_box(reader.join().expect("positive-control reader"));
+}
 
 fn make_ring(tag: &str, slots: usize, capacity: usize) -> Ring {
     let name = format!(

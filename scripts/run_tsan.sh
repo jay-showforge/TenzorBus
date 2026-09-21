@@ -13,7 +13,8 @@
 #
 # The gate is self-verifying: it runs the suite a second time with the
 # `tsan-positive-control` feature, which downgrades the commit release/acquire
-# pair to Relaxed, and FAILS if TSan does not then report a race in tenzorbus.
+# pair to Relaxed and enables a test-only explicit data race, and FAILS if TSan
+# does not then report a race in TenzorBus code.
 # That is what makes "0 warnings naming our code" mean something, rather than
 # proving the suppressions swallowed everything.
 #
@@ -35,7 +36,7 @@ export RUSTC_BOOTSTRAP=1
 export RUSTFLAGS="-Zsanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
 export TSAN_OPTIONS="suppressions=$SUPP halt_on_error=0"
 
-OURS_RE='tenzorbus/src/|tenzor-core/src/|tenzorbus::ring|tenzorbus::futex|tenzorbus::shm|tenzor_core::'
+OURS_RE='tenzorbus/src/|tenzor-core/src/|tenzorbus/tests/tsan_threads.rs|tenzorbus::ring|tenzorbus::futex|tenzorbus::shm|tenzor_core::'
 
 echo "== TSan: clean build =="
 ( cd "$ROOT/rust" && cargo test --target "$TARGET" --test tsan_threads ) \
@@ -46,12 +47,12 @@ CLEAN_OURS=$(grep -Ec "$OURS_RE" "$LOGDIR/clean.log" || true)
 CLEAN_PASSED=$(grep -c "test result: ok" "$LOGDIR/clean.log" || true)
 echo "   tests_ok_lines=$CLEAN_PASSED  tsan_warnings=$CLEAN_WARN  frames_in_tenzorbus=$CLEAN_OURS"
 
-# Whether TSan observes a relaxed-ordering race depends on the threads actually
-# interleaving in the window, so a single attempt is a coin flip on a 2-core box.
-# Retry a bounded number of times and require at least one detection: that keeps
-# the gate meaningful without making it flaky.
+# The test-only explicit race makes detection reliable, while the existing
+# relaxed-ordering control still exercises the ring. Keep bounded retries for
+# runner scheduling variance and require at least one detection; the gate still
+# fails closed when the injected race is never observed.
 CONTROL_ATTEMPTS="${TSAN_CONTROL_ATTEMPTS:-6}"
-echo "== TSan: positive control (commit ordering deliberately relaxed) =="
+echo "== TSan: positive control (test-only race + relaxed commit ordering) =="
 CTRL_RC=0; CTRL_WARN=0; CTRL_OURS=0; CTRL_TRIES=0
 for attempt in $(seq 1 "$CONTROL_ATTEMPTS"); do
   CTRL_TRIES=$attempt
@@ -124,9 +125,10 @@ report = {
         "detected_the_injected_race": ctrl_warn > 0 and ctrl_ours > 0,
         "attempts_needed": int(sys.argv[10]),
         "note": (
-            "Whether TSan observes a relaxed-ordering race depends on the threads "
-            "interleaving inside the window, so the control is retried up to "
-            "TSAN_CONTROL_ATTEMPTS times and passes on the first detection."
+            "The feature enables a test-only explicit data race and relaxes the "
+            "ring commit ordering. The control is retried up to "
+            "TSAN_CONTROL_ATTEMPTS times for runner scheduling variance and "
+            "passes only after TSan reports a warning in TenzorBus code."
         ),
         "warning_top_frames": top_frames(control_log),
     },

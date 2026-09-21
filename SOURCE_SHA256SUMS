@@ -1,5 +1,5 @@
 24cfd0529f8a2e378bd19a6ba015bb12d7ad08d37b4364b27c1b1ecf96325b52  ./.gitattributes
-e6f0abc13224a30ca8cb630f43865f6e2dbc5a9480b7566d938789302f2e9d88  ./.github/workflows/ci.yml
+fa3e239e259c502549fa055eda13bf1ff6ce9c5e6299f086e2da67b0bb5cc7c5  ./.github/workflows/ci.yml
 976ac8cf83751969cd7339f3261a6e44f8084cb82e73c1683b192c41f048e857  ./.gitignore
 781aeb01e039e21a6395470e1ce468687d10ba04310b360476c59158d0207644  ./BENCHMARKS.md
 f87f2ecbd943de3467bee5bf84acd8e844fd79a3ca4eae0c235d9a785837cad2  ./BENCHMARK_REPORT.md
@@ -75,7 +75,7 @@ e4690e09d605840c8ff7879186ca3254e822f31db1620db942ac80721b5e7248  ./rust/tenzorb
 4ab28ad87aeb2ebc05a04c8453055104e74bd3f9b4fda3ef4572befe29138da0  ./rust/tenzorbus/tests/direct_write.rs
 d052c961ea4709ba1767b97996f09fcba2cc9ef859440d126f935b7947447334  ./rust/tenzorbus/tests/golden_bytes.rs
 285266014eb8a90dddcc8a355c999aa1ea588c75edd117c0b97b796f08706c60  ./rust/tenzorbus/tests/production_ring.rs
-d4ee058a1660e55080aad869a7bd8a5645b56055e1228088c5ccd5187e29b7cb  ./rust/tenzorbus/tests/tsan_threads.rs
+db522098928653e792bbc8dcec171d9a231b144d2c50ff98c2e86f76c1bc850b  ./rust/tenzorbus/tests/tsan_threads.rs
 7e7fcce13abc7bd033987fb9d0322b8b23211c003484fb655790596ca28b9934  ./scripts/build_bridge.sh
 c57421c184991700f8722a99da0ed08a426a13ee0de640a6a2a325f5e30cc130  ./scripts/build_release_assets.sh
 92d642a2bca69e8d0d40d57fd815bdc77c9e70ff7e9b21d8ec136bd9f555bfaf  ./scripts/build_rust.sh
@@ -86,7 +86,7 @@ bb2de65ef6efaac14b7f1142667ea3c53c20959dc1b9181f3070e203023d459e  ./scripts/run_
 1f681b4daabb4a90bf3627ddd76760d116091e6123c7af42588a3929a900b4e3  ./scripts/run_live_soak.sh
 cd7602801ce45187bb8cf3f718debc65b0840b56e085b9c5fa74c06ad8e8bb54  ./scripts/run_rust_stress.sh
 57feceacc67a98cb58e6dc50ec1d45c212fab60f739af768952465b15557e94a  ./scripts/run_tests.sh
-a7492e73b54fc9a11e9141065ad26e78f9ec793a9c05ffa2210f1e86a2b1acf6  ./scripts/run_tsan.sh
+b703ebff0994e7b9a1cfd802958dad2bf67d7795fbf16d865f82a03e5657ec2f  ./scripts/run_tsan.sh
 0782cc4d93473287b7d85e5231c39ad88f9f8da2752bf04c2573d5dac06f8432  ./scripts/tsan-suppressions.txt
 d7fa40aedb3629b00acb6f8fa673c88995f4cb679ab35f45fa38b548ee64291c  ./scripts/update_source_checksums.py
 55a6cba1b38aaaf9b8071d243f7fdd542415b9251d7fb60aff41a6eb2c76042b  ./scripts/verify_authoritative_epyc.py

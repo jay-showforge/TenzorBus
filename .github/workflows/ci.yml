@@ -28,8 +28,10 @@ jobs:
           pip install build maturin numpy pyarrow pytest
           pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Install cargo-deny
-        uses: taiki-e/install-action@cargo-deny
+      - name: Install cargo-deny 0.20.2
+        uses: taiki-e/install-action@347438fa49c6c030ac9a8f98ea84f0e151483e84
+        with:
+          tool: cargo-deny@0.20.2
 
       - name: Build the workspace and the extension module
         run: scripts/build_rust.sh
@@ -79,6 +81,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y nasm ffmpeg
       - run: pip install build maturin numpy pyarrow pytest
       - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Install cargo-deny 0.20.2
+        uses: taiki-e/install-action@347438fa49c6c030ac9a8f98ea84f0e151483e84
+        with:
+          tool: cargo-deny@0.20.2
       # The integration is only real if it runs the real engine. Build TenzorPipe
       # from its v0.3.2 tag, with the direct-write patch, rather than
       # substituting a fixture.

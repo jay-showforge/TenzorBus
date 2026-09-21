@@ -1,0 +1,19 @@
+# ThreadSanitizer suppressions for the TenzorBus gate.
+#
+# The stable Rust toolchain ships a PRECOMPILED, UNINSTRUMENTED standard library.
+# TSan therefore cannot see the synchronisation inside std and reports std's own
+# lock-free data structures as races. The entries below are limited to exactly
+# those constructs, all of them in libtest's plumbing rather than in anything
+# TenzorBus touches.
+#
+# Nothing here may name tenzorbus or tenzor-core. scripts/run_tsan.sh enforces
+# that by failing if the clean run reports a warning whose frames name our code,
+# and by re-running with a deliberately broken memory ordering to confirm the
+# gate still detects a real race in our code.
+
+# libtest ships completed-test results from each test thread to the main thread
+# over std::sync::mpmc, whose internal atomics TSan cannot observe.
+race:std::sync::mpmc
+race:test::event::CompletedTest
+# The memcpy std uses to move a value into/out of that uninstrumented channel.
+race:core::profiling::compiler_copy

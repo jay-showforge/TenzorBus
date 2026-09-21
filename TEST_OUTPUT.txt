@@ -1,0 +1,18 @@
+test_pyarrow_available_for_live_tenzorpipe_loader (test_integration_contract.IntegrationContractTests.test_pyarrow_available_for_live_tenzorpipe_loader) ... skipped 'pyarrow not installed in this sandbox'
+test_tenzorpipe_loader_contract_is_documented (test_integration_contract.IntegrationContractTests.test_tenzorpipe_loader_contract_is_documented) ... ok
+test_bounded_ring_does_not_overwrite_active_reader (test_ring.RingTests.test_bounded_ring_does_not_overwrite_active_reader) ... ok
+test_multi_consumer_same_publication (test_ring.RingTests.test_multi_consumer_same_publication) ... /usr/lib/python3.13/multiprocessing/popen_fork.py:67: DeprecationWarning: This process (pid=1737) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  self.pid = os.fork()
+ok
+test_zero_copy_numpy_view (test_ring.RingTests.test_zero_copy_numpy_view) ... ok
+test_zero_copy_torch_view (test_ring.RingTests.test_zero_copy_torch_view) ... ok
+test_real_release_ingest_is_deterministic_arrow (test_tenzorpipe_release.TenzorPipeReleaseTests.test_real_release_ingest_is_deterministic_arrow) ... video 320x240, duration 2000ms, decoded 60 access units, resized 4 selected pictures
+TenzorPipe 0.2.0: 4 epochs in 0.057s
+video 320x240, duration 2000ms, decoded 60 access units, resized 4 selected pictures
+TenzorPipe 0.2.0: 4 epochs in 0.043s
+ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.323s
+
+OK (skipped=1)

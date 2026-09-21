@@ -1,0 +1,20 @@
+[package]
+name = "tenzorbus"
+version = "0.1.0-alpha.0"
+edition = "2024"
+license = "BUSL-1.1"
+publish = false
+
+[features]
+# Deliberately breaks the release/acquire pair that orders a consumer's payload
+# reads against the producer's copy, so `scripts/run_tsan.sh` can prove the
+# sanitizer run actually detects a race in this crate. Never enable in a build
+# anyone uses.
+tsan-positive-control = []
+
+[dependencies]
+libc = "0.2.189"
+tenzor-core = { path = "../tenzor-core" }
+
+[lib]
+path = "src/lib.rs"

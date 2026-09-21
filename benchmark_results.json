@@ -1,0 +1,29 @@
+{
+  "environment": {
+    "python": "3.13.5",
+    "pid": 903
+  },
+  "tensor": {
+    "shape": [
+      3,
+      224,
+      224
+    ],
+    "dtype": "float32",
+    "bytes": 602112
+  },
+  "iterations": 1000,
+  "tenzorbus_reference": {
+    "scope": "producer copy into SHM + consumer zero-copy acquire/read/release",
+    "median_ms": 0.038783,
+    "p95_ms": 0.054863,
+    "min_ms": 0.037416
+  },
+  "json_base64_reference": {
+    "scope": "base64 encode + JSON serialize/parse + base64 decode + ndarray view",
+    "median_ms": 3.4303090000000003,
+    "p95_ms": 4.400953,
+    "min_ms": 3.194946
+  },
+  "median_speedup_vs_json_base64": 88.44877910424671
+}

@@ -1,0 +1,2370 @@
+{
+  "benchmark_status": "passed",
+  "methodology": "Phase 5: a fair transport matrix -- TenzorBus against realistic local alternatives.\n\nMethodology, stated up front because it is the part that matters\n---------------------------------------------------------------\n\n*What is measured.* One number per publication: the wall-clock interval from the\nmoment the producer has a tensor in hand and begins handing it over, to the moment\na consumer process has a usable array over those bytes. That interval is the\ntransport, and nothing else.\n\n*What is deliberately excluded.* No media decode: the payload is generated once\nbefore timing starts and reused, so TenzorPipe's decoder never runs inside a\nmeasurement. No model inference: consumers run no model. Those are separate costs\nand blending them into a transport number would make it meaningless.\n\n*What every consumer does with the bytes, identically in every path.* It builds a\nNumPy array over them and sums a fixed stride of 4096 elements. That work is the\nsame in all paths, so it cancels out of comparisons, and it forces real reads\nrather than letting a zero-copy path skip touching memory. It is deliberately not\na full-buffer sum: that would add the same large constant to every path and\nflatter the slower ones.\n\n*Clock.* `time.monotonic_ns()`, which is system-wide on Linux and therefore\ncomparable across processes. The send timestamp travels with the payload: in the\nslot's own timestamp field for TenzorBus, and as an 8-byte prefix (or header) for\nthe socket, pipe and HTTP paths. The prefix costs those paths 8 bytes out of\ntens of kilobytes.\n\n*Fan-out.* With N consumers, a point-to-point transport must deliver the payload N\ntimes, because that is what those transports actually do. TenzorBus publishes once\nand all N read the same slot. That asymmetry is the thing under measurement, not a\nthumb on the scale.\n\n*Copies per path* are counted analytically, not measured, and reported alongside.\n\nUsage:\n    benchmarks/benchmark_matrix.py run --output benchmark_matrix.json\n    benchmarks/benchmark_matrix.py consume --path unix_socket --endpoint ... --expect N",
+  "host": {
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpus": 16,
+    "python": "3.12.3",
+    "numpy": "2.5.3"
+  },
+  "payload_sizes_bytes": [
+    65536,
+    602112,
+    4194304,
+    16777216
+  ],
+  "real_frame_note": "602112 bytes is a real TenzorPipe video tensor, float32 [3,224,224]",
+  "fanout": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "excluded": [
+    "media decode",
+    "model inference"
+  ],
+  "consumer_work": "NumPy array over the payload plus a 4096-sample strided sum, identical in every path",
+  "path_notes": {
+    "tenzorbus_copy": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+    "tenzorbus_direct": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+    "tenzorbus_direct_nofill": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+    "unix_socket": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+    "fifo": "A named pipe per consumer.",
+    "http_binary": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+    "http_json_b64": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid."
+  },
+  "unix_socket_transport": "af_unix_sock_stream_pathname",
+  "expected_cases": 49,
+  "cases": [
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 1500,
+      "delivered_per_consumer": [
+        1500
+      ],
+      "latency_median_ms": 0.0404,
+      "latency_p95_ms": 0.2395,
+      "latency_p99_ms": 0.2787,
+      "producer_elapsed_s": 0.0609,
+      "publications_per_s": 24630.6,
+      "producer_MiB_per_s": 1539.4,
+      "delivered_MiB_per_s": 1539.4,
+      "producer_rusage": {
+        "max_rss_kib": 32148,
+        "cpu_s": 1.7252
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 30836,
+          "cpu_s": 1.6941
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 65536,
+        "next_sequence": 1501,
+        "consumers": 1,
+        "published": 1500,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 1500,
+      "delivered_per_consumer": [
+        1500
+      ],
+      "latency_median_ms": 0.0218,
+      "latency_p95_ms": 0.1429,
+      "latency_p99_ms": 0.235,
+      "producer_elapsed_s": 0.0503,
+      "publications_per_s": 29823.6,
+      "producer_MiB_per_s": 1864.0,
+      "delivered_MiB_per_s": 1864.0,
+      "producer_rusage": {
+        "max_rss_kib": 32796,
+        "cpu_s": 1.772
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 32284,
+          "cpu_s": 1.6763
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 65536,
+        "next_sequence": 1501,
+        "consumers": 1,
+        "published": 1500,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 1500,
+      "delivered_per_consumer": [
+        1500
+      ],
+      "latency_median_ms": 0.0038,
+      "latency_p95_ms": 0.2083,
+      "latency_p99_ms": 0.3063,
+      "producer_elapsed_s": 0.0612,
+      "publications_per_s": 24512.4,
+      "producer_MiB_per_s": 1532.0,
+      "delivered_MiB_per_s": 1532.0,
+      "producer_rusage": {
+        "max_rss_kib": 32796,
+        "cpu_s": 1.8212
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 32796,
+          "cpu_s": 1.6423
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 65536,
+        "next_sequence": 1501,
+        "consumers": 1,
+        "published": 1500,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 1500,
+      "delivered_per_consumer": [
+        1500
+      ],
+      "latency_median_ms": 0.0511,
+      "latency_p95_ms": 0.0968,
+      "latency_p99_ms": 0.1539,
+      "producer_elapsed_s": 0.0354,
+      "publications_per_s": 42325.4,
+      "producer_MiB_per_s": 2645.3,
+      "delivered_MiB_per_s": 2645.3,
+      "producer_rusage": {
+        "max_rss_kib": 32796,
+        "cpu_s": 1.8387
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 32796,
+          "cpu_s": 1.7051
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 1500,
+      "delivered_per_consumer": [
+        1500
+      ],
+      "latency_median_ms": 0.0322,
+      "latency_p95_ms": 0.0515,
+      "latency_p99_ms": 0.0993,
+      "producer_elapsed_s": 0.0376,
+      "publications_per_s": 39929.3,
+      "producer_MiB_per_s": 2495.6,
+      "delivered_MiB_per_s": 2495.6,
+      "producer_rusage": {
+        "max_rss_kib": 32796,
+        "cpu_s": 1.8562
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 32796,
+          "cpu_s": 1.7051
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 1500,
+      "delivered_per_consumer": [
+        1500
+      ],
+      "latency_median_ms": 0.085,
+      "latency_p95_ms": 0.1417,
+      "latency_p99_ms": 0.1838,
+      "producer_elapsed_s": 0.261,
+      "publications_per_s": 5747.4,
+      "producer_MiB_per_s": 359.2,
+      "delivered_MiB_per_s": 359.2,
+      "producer_rusage": {
+        "max_rss_kib": 37660,
+        "cpu_s": 2.011
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 36732,
+          "cpu_s": 1.8396
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 3,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 65536,
+      "consumers": 1,
+      "iterations": 150,
+      "delivered_per_consumer": [
+        150
+      ],
+      "latency_median_ms": 0.2542,
+      "latency_p95_ms": 0.3681,
+      "latency_p99_ms": 0.4891,
+      "producer_elapsed_s": 0.0813,
+      "publications_per_s": 1845.8,
+      "producer_MiB_per_s": 115.4,
+      "delivered_MiB_per_s": 115.4,
+      "producer_rusage": {
+        "max_rss_kib": 37660,
+        "cpu_s": 2.0534
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 37660,
+          "cpu_s": 1.7446
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 6,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334
+      ],
+      "latency_median_ms": 0.0793,
+      "latency_p95_ms": 2.0121,
+      "latency_p99_ms": 4.0809,
+      "producer_elapsed_s": 0.0395,
+      "publications_per_s": 8464.9,
+      "producer_MiB_per_s": 4860.7,
+      "delivered_MiB_per_s": 4860.7,
+      "producer_rusage": {
+        "max_rss_kib": 47544,
+        "cpu_s": 2.0833
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 42936,
+          "cpu_s": 1.6793
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 1,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334
+      ],
+      "latency_median_ms": 0.037,
+      "latency_p95_ms": 0.4423,
+      "latency_p99_ms": 1.5708,
+      "producer_elapsed_s": 0.0374,
+      "publications_per_s": 8932.6,
+      "producer_MiB_per_s": 5129.3,
+      "delivered_MiB_per_s": 5129.3,
+      "producer_rusage": {
+        "max_rss_kib": 48464,
+        "cpu_s": 2.1117
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 47544,
+          "cpu_s": 1.4291
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 0,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334
+      ],
+      "latency_median_ms": 0.022,
+      "latency_p95_ms": 0.4111,
+      "latency_p99_ms": 2.0041,
+      "producer_elapsed_s": 0.0383,
+      "publications_per_s": 8721.4,
+      "producer_MiB_per_s": 5008.0,
+      "delivered_MiB_per_s": 5008.0,
+      "producer_rusage": {
+        "max_rss_kib": 48464,
+        "cpu_s": 2.1413
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 48464,
+          "cpu_s": 1.6768
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 1,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334
+      ],
+      "latency_median_ms": 0.161,
+      "latency_p95_ms": 0.2857,
+      "latency_p99_ms": 0.402,
+      "producer_elapsed_s": 0.048,
+      "publications_per_s": 6959.6,
+      "producer_MiB_per_s": 3996.3,
+      "delivered_MiB_per_s": 3996.3,
+      "producer_rusage": {
+        "max_rss_kib": 48464,
+        "cpu_s": 2.173
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 48464,
+          "cpu_s": 1.7039
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334
+      ],
+      "latency_median_ms": 0.2136,
+      "latency_p95_ms": 0.4832,
+      "latency_p99_ms": 0.7193,
+      "producer_elapsed_s": 0.0958,
+      "publications_per_s": 3486.9,
+      "producer_MiB_per_s": 2002.2,
+      "delivered_MiB_per_s": 2002.2,
+      "producer_rusage": {
+        "max_rss_kib": 48464,
+        "cpu_s": 2.2189
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 48464,
+          "cpu_s": 1.7241
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334
+      ],
+      "latency_median_ms": 0.1163,
+      "latency_p95_ms": 0.1721,
+      "latency_p99_ms": 0.2696,
+      "producer_elapsed_s": 0.0717,
+      "publications_per_s": 4659.4,
+      "producer_MiB_per_s": 2675.5,
+      "delivered_MiB_per_s": 2675.5,
+      "producer_rusage": {
+        "max_rss_kib": 48464,
+        "cpu_s": 2.2661
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 48464,
+          "cpu_s": 1.755
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 3,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 602112,
+      "consumers": 1,
+      "iterations": 33,
+      "delivered_per_consumer": [
+        33
+      ],
+      "latency_median_ms": 2.3703,
+      "latency_p95_ms": 4.9558,
+      "latency_p99_ms": 5.1114,
+      "producer_elapsed_s": 0.1486,
+      "publications_per_s": 222.0,
+      "producer_MiB_per_s": 127.5,
+      "delivered_MiB_per_s": 127.5,
+      "producer_rusage": {
+        "max_rss_kib": 48464,
+        "cpu_s": 2.3476
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 48464,
+          "cpu_s": 1.7653
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 6,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 48,
+      "delivered_per_consumer": [
+        48
+      ],
+      "latency_median_ms": 0.4247,
+      "latency_p95_ms": 4.4433,
+      "latency_p99_ms": 7.5486,
+      "producer_elapsed_s": 0.0299,
+      "publications_per_s": 1606.2,
+      "producer_MiB_per_s": 6424.7,
+      "delivered_MiB_per_s": 6424.7,
+      "producer_rusage": {
+        "max_rss_kib": 106888,
+        "cpu_s": 2.3989
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 74120,
+          "cpu_s": 1.6983
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 4194304,
+        "next_sequence": 49,
+        "consumers": 1,
+        "published": 48,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 48,
+      "delivered_per_consumer": [
+        48
+      ],
+      "latency_median_ms": 0.3799,
+      "latency_p95_ms": 1.946,
+      "latency_p99_ms": 3.1902,
+      "producer_elapsed_s": 0.039,
+      "publications_per_s": 1230.1,
+      "producer_MiB_per_s": 4920.5,
+      "delivered_MiB_per_s": 4920.5,
+      "producer_rusage": {
+        "max_rss_kib": 114872,
+        "cpu_s": 2.4514
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 106888,
+          "cpu_s": 1.4495
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 4194304,
+        "next_sequence": 49,
+        "consumers": 0,
+        "published": 48,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 48,
+      "delivered_per_consumer": [
+        48
+      ],
+      "latency_median_ms": 0.0127,
+      "latency_p95_ms": 1.8774,
+      "latency_p99_ms": 4.7333,
+      "producer_elapsed_s": 0.038,
+      "publications_per_s": 1262.1,
+      "producer_MiB_per_s": 5048.2,
+      "delivered_MiB_per_s": 5048.2,
+      "producer_rusage": {
+        "max_rss_kib": 114872,
+        "cpu_s": 2.5017
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 114872,
+          "cpu_s": 1.67
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 4194304,
+        "next_sequence": 49,
+        "consumers": 0,
+        "published": 48,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 48,
+      "delivered_per_consumer": [
+        48
+      ],
+      "latency_median_ms": 0.8279,
+      "latency_p95_ms": 1.3958,
+      "latency_p99_ms": 3.3939,
+      "producer_elapsed_s": 0.0447,
+      "publications_per_s": 1074.4,
+      "producer_MiB_per_s": 4297.6,
+      "delivered_MiB_per_s": 4297.6,
+      "producer_rusage": {
+        "max_rss_kib": 114872,
+        "cpu_s": 2.5347
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 114872,
+          "cpu_s": 1.7022
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 48,
+      "delivered_per_consumer": [
+        48
+      ],
+      "latency_median_ms": 3.1516,
+      "latency_p95_ms": 3.8447,
+      "latency_p99_ms": 4.4166,
+      "producer_elapsed_s": 0.1434,
+      "publications_per_s": 334.7,
+      "producer_MiB_per_s": 1338.6,
+      "delivered_MiB_per_s": 1338.6,
+      "producer_rusage": {
+        "max_rss_kib": 114872,
+        "cpu_s": 2.6075
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 114872,
+          "cpu_s": 1.729
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 48,
+      "delivered_per_consumer": [
+        48
+      ],
+      "latency_median_ms": 0.4723,
+      "latency_p95_ms": 1.4441,
+      "latency_p99_ms": 3.4317,
+      "producer_elapsed_s": 0.041,
+      "publications_per_s": 1170.5,
+      "producer_MiB_per_s": 4681.9,
+      "delivered_MiB_per_s": 4681.9,
+      "producer_rusage": {
+        "max_rss_kib": 114872,
+        "cpu_s": 2.6423
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 114872,
+          "cpu_s": 1.73
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 3,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 4194304,
+      "consumers": 1,
+      "iterations": 10,
+      "delivered_per_consumer": [
+        10
+      ],
+      "latency_median_ms": 16.1726,
+      "latency_p95_ms": 24.975,
+      "latency_p99_ms": 24.975,
+      "producer_elapsed_s": 0.2939,
+      "publications_per_s": 34.0,
+      "producer_MiB_per_s": 136.1,
+      "delivered_MiB_per_s": 136.1,
+      "producer_rusage": {
+        "max_rss_kib": 114872,
+        "cpu_s": 2.7911
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 114872,
+          "cpu_s": 1.8732
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 6,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 40,
+      "delivered_per_consumer": [
+        40
+      ],
+      "latency_median_ms": 1.0796,
+      "latency_p95_ms": 7.197,
+      "latency_p99_ms": 7.6055,
+      "producer_elapsed_s": 0.0813,
+      "publications_per_s": 491.9,
+      "producer_MiB_per_s": 7870.9,
+      "delivered_MiB_per_s": 7870.9,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 2.958
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 196888,
+          "cpu_s": 1.7024
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 16777216,
+        "next_sequence": 41,
+        "consumers": 1,
+        "published": 40,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 40,
+      "delivered_per_consumer": [
+        40
+      ],
+      "latency_median_ms": 0.895,
+      "latency_p95_ms": 10.4718,
+      "latency_p99_ms": 13.0753,
+      "producer_elapsed_s": 0.0736,
+      "publications_per_s": 543.2,
+      "producer_MiB_per_s": 8691.4,
+      "delivered_MiB_per_s": 8691.4,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 3.1053
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.6775
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 16777216,
+        "next_sequence": 41,
+        "consumers": 1,
+        "published": 40,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 40,
+      "delivered_per_consumer": [
+        40
+      ],
+      "latency_median_ms": 0.0593,
+      "latency_p95_ms": 0.1652,
+      "latency_p99_ms": 1.7546,
+      "producer_elapsed_s": 0.0696,
+      "publications_per_s": 574.6,
+      "producer_MiB_per_s": 9194.3,
+      "delivered_MiB_per_s": 9194.3,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 3.2507
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.6966
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 16777216,
+        "next_sequence": 41,
+        "consumers": 1,
+        "published": 40,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 40,
+      "delivered_per_consumer": [
+        40
+      ],
+      "latency_median_ms": 3.4413,
+      "latency_p95_ms": 4.4977,
+      "latency_p99_ms": 18.9073,
+      "producer_elapsed_s": 0.1574,
+      "publications_per_s": 254.2,
+      "producer_MiB_per_s": 4067.1,
+      "delivered_MiB_per_s": 4067.1,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 3.4293
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.7731
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 40,
+      "delivered_per_consumer": [
+        40
+      ],
+      "latency_median_ms": 13.1945,
+      "latency_p95_ms": 14.3793,
+      "latency_p99_ms": 26.3251,
+      "producer_elapsed_s": 0.5294,
+      "publications_per_s": 75.6,
+      "producer_MiB_per_s": 1208.8,
+      "delivered_MiB_per_s": 1208.8,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 3.7108
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.955
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 2,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 40,
+      "delivered_per_consumer": [
+        40
+      ],
+      "latency_median_ms": 2.294,
+      "latency_p95_ms": 6.4918,
+      "latency_p99_ms": 7.8408,
+      "producer_elapsed_s": 0.1124,
+      "publications_per_s": 355.7,
+      "producer_MiB_per_s": 5691.6,
+      "delivered_MiB_per_s": 5691.6,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 3.8312
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.7824
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 3,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 16777216,
+      "consumers": 1,
+      "iterations": 10,
+      "delivered_per_consumer": [
+        10
+      ],
+      "latency_median_ms": 76.5444,
+      "latency_p95_ms": 81.0936,
+      "latency_p99_ms": 81.0936,
+      "producer_elapsed_s": 1.2918,
+      "publications_per_s": 7.7,
+      "producer_MiB_per_s": 123.9,
+      "delivered_MiB_per_s": 123.9,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.5586
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 2.3758
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 6,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0698,
+      "latency_p95_ms": 0.2198,
+      "latency_p99_ms": 0.3637,
+      "producer_elapsed_s": 0.0261,
+      "publications_per_s": 12796.0,
+      "producer_MiB_per_s": 7347.7,
+      "delivered_MiB_per_s": 14695.4,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.5891
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.0439
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.8893
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 2,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0457,
+      "latency_p95_ms": 0.1602,
+      "latency_p99_ms": 0.2782,
+      "producer_elapsed_s": 0.0248,
+      "publications_per_s": 13446.4,
+      "producer_MiB_per_s": 7721.2,
+      "delivered_MiB_per_s": 15442.3,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.6185
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.1539
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.7597
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 2,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0222,
+      "latency_p95_ms": 0.0517,
+      "latency_p99_ms": 0.1005,
+      "producer_elapsed_s": 0.026,
+      "publications_per_s": 12833.5,
+      "producer_MiB_per_s": 7369.3,
+      "delivered_MiB_per_s": 14738.5,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.6491
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.9929
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.8926
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 2,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0859,
+      "latency_p95_ms": 0.1774,
+      "latency_p99_ms": 0.3062,
+      "producer_elapsed_s": 0.0622,
+      "publications_per_s": 5368.5,
+      "producer_MiB_per_s": 3082.7,
+      "delivered_MiB_per_s": 6165.4,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.7035
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.9157
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.0311
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 3,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334
+      ],
+      "latency_median_ms": 0.4616,
+      "latency_p95_ms": 0.6027,
+      "latency_p99_ms": 0.8208,
+      "producer_elapsed_s": 0.3131,
+      "publications_per_s": 1066.6,
+      "producer_MiB_per_s": 612.5,
+      "delivered_MiB_per_s": 1224.9,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.8446
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.1287
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.9613
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 3,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334
+      ],
+      "latency_median_ms": 0.1416,
+      "latency_p95_ms": 0.2093,
+      "latency_p99_ms": 0.3833,
+      "producer_elapsed_s": 0.1627,
+      "publications_per_s": 2053.4,
+      "producer_MiB_per_s": 1179.1,
+      "delivered_MiB_per_s": 2358.2,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 4.9404
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.0302
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.9923
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 5,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 602112,
+      "consumers": 2,
+      "iterations": 33,
+      "delivered_per_consumer": [
+        33,
+        33
+      ],
+      "latency_median_ms": 1.8826,
+      "latency_p95_ms": 2.3115,
+      "latency_p99_ms": 2.5856,
+      "producer_elapsed_s": 0.2694,
+      "publications_per_s": 122.5,
+      "producer_MiB_per_s": 70.3,
+      "delivered_MiB_per_s": 140.7,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.0568
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.1647
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.9021
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 9,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.1046,
+      "latency_p95_ms": 0.1853,
+      "latency_p99_ms": 0.3276,
+      "producer_elapsed_s": 0.039,
+      "publications_per_s": 8553.3,
+      "producer_MiB_per_s": 4911.5,
+      "delivered_MiB_per_s": 19645.9,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.1011
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5286
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5369
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5942
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6045
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 4,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0645,
+      "latency_p95_ms": 0.1153,
+      "latency_p99_ms": 0.2993,
+      "producer_elapsed_s": 0.0373,
+      "publications_per_s": 8955.8,
+      "producer_MiB_per_s": 5142.6,
+      "delivered_MiB_per_s": 20570.3,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.1438
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.592
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5383
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5553
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5807
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 4,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0345,
+      "latency_p95_ms": 0.0589,
+      "latency_p99_ms": 0.1037,
+      "producer_elapsed_s": 0.0384,
+      "publications_per_s": 8707.3,
+      "producer_MiB_per_s": 4999.9,
+      "delivered_MiB_per_s": 19999.7,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.1883
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5669
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5498
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5223
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5306
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 4,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0836,
+      "latency_p95_ms": 0.1691,
+      "latency_p99_ms": 0.2836,
+      "producer_elapsed_s": 0.1164,
+      "publications_per_s": 2868.9,
+      "producer_MiB_per_s": 1647.4,
+      "delivered_MiB_per_s": 6589.4,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.2951
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5695
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6004
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5261
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5692
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 5,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.4605,
+      "latency_p95_ms": 0.7434,
+      "latency_p99_ms": 1.0536,
+      "producer_elapsed_s": 0.6397,
+      "publications_per_s": 522.1,
+      "producer_MiB_per_s": 299.8,
+      "delivered_MiB_per_s": 1199.2,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.586
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5959
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6314
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5939
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6577
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 5,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.153,
+      "latency_p95_ms": 0.246,
+      "latency_p99_ms": 0.4521,
+      "producer_elapsed_s": 0.3627,
+      "publications_per_s": 920.9,
+      "producer_MiB_per_s": 528.8,
+      "delivered_MiB_per_s": 2115.3,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 5.79
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6133
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5846
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6301
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6152
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 9,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 602112,
+      "consumers": 4,
+      "iterations": 33,
+      "delivered_per_consumer": [
+        33,
+        33,
+        33,
+        33
+      ],
+      "latency_median_ms": 2.0253,
+      "latency_p95_ms": 2.8312,
+      "latency_p99_ms": 3.2388,
+      "producer_elapsed_s": 0.577,
+      "publications_per_s": 57.2,
+      "producer_MiB_per_s": 32.8,
+      "delivered_MiB_per_s": 131.4,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 6.043
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6064
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6668
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6262
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6635
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 15,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "tenzorbus_copy",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.1678,
+      "latency_p95_ms": 0.2667,
+      "latency_p99_ms": 0.3711,
+      "producer_elapsed_s": 0.0641,
+      "publications_per_s": 5214.0,
+      "producer_MiB_per_s": 2994.0,
+      "delivered_MiB_per_s": 23951.8,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 6.1148
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3972
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4636
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4358
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4137
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5177
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4485
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.1115
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4031
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "one memcpy into the slot; every consumer reads that slot in place",
+      "path_note": "publish(): the tensor already exists elsewhere, so the transport copies it once into the slot. Comparable to every other path here.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 7,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0968,
+      "latency_p95_ms": 0.2073,
+      "latency_p99_ms": 0.5961,
+      "producer_elapsed_s": 0.0641,
+      "publications_per_s": 5209.2,
+      "producer_MiB_per_s": 2991.2,
+      "delivered_MiB_per_s": 23929.9,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 6.1863
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4292
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3513
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4036
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3659
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.395
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4171
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.1202
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4239
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 0,
+      "copies_total": 1,
+      "copy_model": "the write lands directly in the slot; filling from an existing array is still one copy",
+      "path_note": "reserve()/commit() with the clock started before the payload is written, so the write is inside the measured interval. Comparable to every other path. Note that filling from an existing array is still one copy: direct-write removes the producer copy only for a producer that can GENERATE into the slot, which is what tenzorbus_direct_nofill isolates.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 5,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "tenzorbus_direct_nofill",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.0517,
+      "latency_p95_ms": 0.1042,
+      "latency_p99_ms": 0.1871,
+      "producer_elapsed_s": 0.0583,
+      "publications_per_s": 5727.1,
+      "producer_MiB_per_s": 3288.6,
+      "delivered_MiB_per_s": 26308.7,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 6.2515
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3859
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.351
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3678
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3743
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3682
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3645
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4457
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.7096
+        }
+      ],
+      "zero_copy_consumers": true,
+      "copies_producer_side": 0,
+      "copies_per_consumer": 0,
+      "copies_total": 0,
+      "copy_model": "a producer generating in place performs no copy at all; the generation itself is excluded",
+      "path_note": "The transport floor for a producer that generates its tensor in place: reserve + commit + consumer acquire, with the generation excluded for the same reason media decode is excluded everywhere. NOT comparable to the other paths, and must never be quoted against them.",
+      "comparable_to_other_paths": false,
+      "all_consumers_received_everything": true,
+      "ring_stats": {
+        "slot_count": 8,
+        "slot_capacity": 602112,
+        "next_sequence": 335,
+        "consumers": 7,
+        "published": 334,
+        "dropped": 0,
+        "reaped": 0,
+        "free_slots": 0,
+        "committed_slots": 8
+      }
+    },
+    {
+      "path": "unix_socket",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.1045,
+      "latency_p95_ms": 0.1755,
+      "latency_p99_ms": 0.3119,
+      "producer_elapsed_s": 0.278,
+      "publications_per_s": 1201.6,
+      "producer_MiB_per_s": 690.0,
+      "delivered_MiB_per_s": 5519.9,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 6.4718
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4038
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4368
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5778
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4396
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3957
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5732
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.3739
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4308
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 9,
+      "copy_model": "write() copies user->kernel once per consumer, read() copies kernel->user",
+      "path_note": "SOCK_STREAM over AF_UNIX, one connection per consumer. The runner uses pathname sockets when permitted and real inherited socketpairs when a seccomp policy blocks socket(AF_UNIX, ...) before pathname handling.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null,
+      "unix_socket_transport": "af_unix_sock_stream_pathname"
+    },
+    {
+      "path": "fifo",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.4945,
+      "latency_p95_ms": 0.8377,
+      "latency_p99_ms": 1.0383,
+      "producer_elapsed_s": 1.3757,
+      "publications_per_s": 242.8,
+      "producer_MiB_per_s": 139.4,
+      "delivered_MiB_per_s": 1115.3,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 7.0958
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5025
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6258
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4318
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4827
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4553
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4933
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4214
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4394
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 1,
+      "copies_total": 9,
+      "copy_model": "same two kernel copies as a socket, through a named pipe",
+      "path_note": "A named pipe per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_binary",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 334,
+      "delivered_per_consumer": [
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334,
+        334
+      ],
+      "latency_median_ms": 0.1663,
+      "latency_p95_ms": 0.2882,
+      "latency_p99_ms": 0.3718,
+      "producer_elapsed_s": 0.7872,
+      "publications_per_s": 424.3,
+      "producer_MiB_per_s": 243.6,
+      "delivered_MiB_per_s": 1949.0,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 7.5007
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4232
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4677
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4406
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4797
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.6769
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5383
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4686
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4432
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 1,
+      "copies_per_consumer": 2,
+      "copies_total": 17,
+      "copy_model": "kernel copies both ways, plus the server buffering the body before handing it over",
+      "path_note": "POST with an octet-stream body to a localhost HTTP server per consumer.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    },
+    {
+      "path": "http_json_b64",
+      "payload_bytes": 602112,
+      "consumers": 8,
+      "iterations": 33,
+      "delivered_per_consumer": [
+        33,
+        33,
+        33,
+        33,
+        33,
+        33,
+        33,
+        33
+      ],
+      "latency_median_ms": 2.0063,
+      "latency_p95_ms": 2.8059,
+      "latency_p99_ms": 3.1943,
+      "producer_elapsed_s": 1.1353,
+      "publications_per_s": 29.1,
+      "producer_MiB_per_s": 16.7,
+      "delivered_MiB_per_s": 133.5,
+      "producer_rusage": {
+        "max_rss_kib": 327960,
+        "cpu_s": 7.9929
+      },
+      "consumer_rusage": [
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4698
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5357
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4995
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 1.2136
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5027
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.4467
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5181
+        },
+        {
+          "max_rss_kib": 327960,
+          "cpu_s": 0.5504
+        }
+      ],
+      "zero_copy_consumers": false,
+      "copies_producer_side": 3,
+      "copies_per_consumer": 3,
+      "copies_total": 27,
+      "copy_model": "base64 encode, JSON serialise, kernel copy out; then kernel copy in, JSON parse, base64 decode",
+      "path_note": "POST of a JSON document with a base64 payload, encoded per publication inside the timed region. The anti-pattern, measured honestly: the v0.1 reference benchmark prebuilt the body, which excluded work a real sender cannot avoid.",
+      "comparable_to_other_paths": true,
+      "all_consumers_received_everything": true,
+      "ring_stats": null
+    }
+  ],
+  "completed_cases": 49,
+  "benchmark_errors": 0,
+  "cases_per_transport": {
+    "tenzorbus_copy": 7,
+    "tenzorbus_direct": 7,
+    "tenzorbus_direct_nofill": 7,
+    "unix_socket": 7,
+    "fifo": 7,
+    "http_binary": 7,
+    "http_json_b64": 7
+  }
+}

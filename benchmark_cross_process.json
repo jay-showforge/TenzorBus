@@ -1,0 +1,28 @@
+{
+  "tensor": {
+    "shape": [
+      3,
+      224,
+      224
+    ],
+    "dtype": "float32",
+    "bytes": 602112
+  },
+  "iterations": 300,
+  "tenzorbus_cross_process": {
+    "scope": "producer copy + shared-memory commit + separate-process acquire + zero-copy read",
+    "median_ms": 0.2724605,
+    "p95_ms": 0.355723,
+    "min_ms": 0.078323,
+    "max_ms": 1.03424
+  },
+  "localhost_http_json": {
+    "scope": "prebuilt base64 JSON payload over localhost HTTP + server JSON/base64 decode",
+    "note": "excludes per-request base64/JSON encoding on sender, so this favors HTTP",
+    "median_ms": 2.213283,
+    "p95_ms": 3.142836,
+    "min_ms": 1.984584,
+    "max_ms": 12.851735
+  },
+  "median_speedup": 8.123316957870959
+}

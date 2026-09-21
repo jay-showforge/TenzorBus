@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "consumers": 8,
+  "publications": 500,
+  "consumer_deliveries": 4000,
+  "elapsed_s": 0.4122091189999537,
+  "publications_per_s": 1212.976562025199,
+  "results": [
+    {
+      "pid": 1598,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1592,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1596,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1594,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1595,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1599,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1597,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    },
+    {
+      "pid": 1593,
+      "bad": 0,
+      "first": 1,
+      "last": 500,
+      "count": 500,
+      "strict": true
+    }
+  ],
+  "ring_stats": {
+    "name": "stress_1581_1789926550622737037",
+    "slot_count": 16,
+    "slot_capacity": 50176,
+    "next_sequence": 501,
+    "consumers": 0,
+    "published": 500,
+    "dropped": 0
+  }
+}

@@ -1,0 +1,36 @@
+[package]
+name = "tenzorbus-tenzorpipe-bridge"
+version = "0.1.0-rc.1"
+edition = "2024"
+license = "BUSL-1.1"
+publish = false
+
+# Deliberately outside the main rust/ workspace: `cargo test` in rust/ must not
+# need a TenzorPipe checkout. scripts/build_bridge.sh links one in as
+# integration/tenzorpipe and builds this crate against it.
+[workspace]
+
+[[bin]]
+name = "tenzorbus-ingest"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+tenzor-pipe = { path = "../tenzorpipe" }
+tenzorbus = { path = "../../rust/tenzorbus" }
+tenzor-core = { path = "../../rust/tenzor-core" }
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+
+# TenzorPipe vendors these four crates and redirects them from its own workspace
+# root. A `[patch]` table only applies at the root of the workspace being built,
+# and this crate is its own workspace, so the same redirects have to be repeated
+# here or Cargo would resolve the real crates.io versions and fail to compile the
+# engine. Paths must stay in step with tenzorpipe/Cargo.toml.
+[patch.crates-io]
+openh264 = { path = "../tenzorpipe/vendor/openh264" }
+openh264-sys2 = { path = "../tenzorpipe/vendor/openh264-sys2" }
+rusty_aac = { path = "../tenzorpipe/vendor/rusty_aac" }
+rust_h264 = { path = "../tenzorpipe/vendor/rust_h264" }

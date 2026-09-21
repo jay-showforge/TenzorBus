@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tenzor Live Lab</title>
+<style>
+:root{--bg:#07101b;--panel:#0d1826;--panel2:#111f30;--line:#22364c;--text:#edf6ff;--muted:#90a4ba;--cyan:#32d9ff;--green:#39e58c;--purple:#a57cff;--red:#ff6a7d;--yellow:#f9c74f}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#10243a 0,#07101b 34%,#050b12 100%);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}.wrap{max-width:1220px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.brand{font-size:28px;font-weight:800;letter-spacing:-.03em}.brand span{color:var(--cyan)}.tag{color:var(--muted)}.status{border:1px solid #1d5944;background:#0c2a22;padding:8px 12px;border-radius:999px;color:#92ffc6}.grid{display:grid;grid-template-columns:1.45fr .8fr;gap:16px}.panel{background:linear-gradient(180deg,#0f1b2a,#0a1420);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px #0006}.pad{padding:18px}.title{font-size:13px;text-transform:uppercase;letter-spacing:.14em;color:#9fb4c9;margin-bottom:12px}.pipeline{display:grid;grid-template-columns:1fr 38px 1fr 38px 1fr;align-items:center;gap:6px}.node{min-height:132px;padding:16px;border:1px solid #29415b;border-radius:14px;background:#0c1724}.node strong{font-size:18px;display:block;margin:5px 0}.node small{color:var(--muted)}.pipe{color:var(--cyan);font-size:28px;text-align:center}.node.pipeNode{border-color:#1d7da8;box-shadow:inset 0 0 0 1px #0aa6dc33}.node.busNode{border-color:#7658c7;box-shadow:inset 0 0 0 1px #a57cff33}.consumers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.consumer{background:#0a201b;border:1px solid #1d704f;padding:11px;border-radius:12px;color:#caffdf}.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.metric{padding:14px;border:1px solid var(--line);border-radius:12px;background:#09131e}.metric b{display:block;font-size:27px;letter-spacing:-.04em;color:var(--green)}.metric span{color:var(--muted);font-size:12px}.compare{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.card{padding:14px;border-radius:12px;border:1px solid var(--line);background:#0a1420}.card.good{border-color:#1d704f}.card.bad{border-color:#713241}.card .big{font-size:25px;font-weight:800}.good .big{color:var(--green)}.bad .big{color:var(--red)}.log{margin-top:16px;background:#050a10;border:1px solid #1c2b3d;border-radius:12px;padding:14px;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#a8bed3;min-height:154px}.ok{color:var(--green)}.cyan{color:var(--cyan)}.purple{color:var(--purple)}.foot{margin-top:16px;color:#698096;font-size:12px;text-align:center}.caveat{margin-top:10px;border-left:3px solid var(--yellow);padding:8px 10px;color:#cdd8e4;background:#15170f;border-radius:4px}.topline{display:flex;justify-content:space-between;gap:12px;align-items:start}.badge{font-size:11px;color:#b8c9dc;border:1px solid #2b4058;border-radius:999px;padding:5px 9px}.bar{height:5px;border-radius:9px;background:#15273b;margin-top:8px;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));width:64%}@media(max-width:900px){.grid{grid-template-columns:1fr}.pipeline{grid-template-columns:1fr}.pipe{transform:rotate(90deg)}.consumers,.compare,.metrics{grid-template-columns:1fr}.wrap{padding:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><div class="brand">Tenzor <span>Live Lab</span></div><div class="tag">Decode it once. Move it without waste.</div></div>
+    <div class="status">● Reference transport running</div>
+  </div>
+  <div class="grid">
+    <section class="panel pad">
+      <div class="topline"><div class="title">Live tensor pipeline</div><div class="badge">v0.1 reference</div></div>
+      <div class="pipeline">
+        <div class="node pipeNode"><small>MEDIA ENGINE</small><strong>TenzorPipe</strong><div>Decode • resize • tensors</div><div class="bar"><i></i></div></div>
+        <div class="pipe">→</div>
+        <div class="node busNode"><small>SHARED MEMORY</small><strong>TenzorBus</strong><div>Bounded ring • fan-out</div><div class="bar"><i style="width:91%"></i></div></div>
+        <div class="pipe">→</div>
+        <div class="node"><small>CONSUMERS</small><strong>Use it everywhere</strong><div>Same slot, multiple readers</div><div class="bar"><i style="width:78%"></i></div></div>
+      </div>
+      <div class="consumers">
+        <div class="consumer">● Object detector<br><small>shared tensor view</small></div>
+        <div class="consumer">● Image embedder<br><small>shared tensor view</small></div>
+        <div class="consumer">● UI preview<br><small>shared tensor view</small></div>
+      </div>
+      <div class="log" id="log">
+        <div><span class="cyan">TenzorPipe</span>: real release ingest test <span class="ok">PASS</span></div>
+        <div><span class="purple">TenzorBus</span>: ring created · 8 bounded slots</div>
+        <div><span class="purple">TenzorBus</span>: two-process fan-out <span class="ok">PASS</span></div>
+        <div>NumPy shared-memory alias <span class="ok">PASS</span></div>
+        <div>PyTorch frombuffer alias <span class="ok">PASS</span></div>
+        <div>Active-reader overwrite protection <span class="ok">PASS</span></div>
+      </div>
+    </section>
+    <aside class="panel pad">
+      <div class="title">Measured in this sandbox</div>
+      <div class="metrics">
+        <div class="metric"><span>Cross-process median</span><b id="shmMed">0.272 ms</b><span>TenzorBus reference</span></div>
+        <div class="metric"><span>Cross-process p95</span><b id="shmP95">0.356 ms</b><span>producer → consumer</span></div>
+        <div class="metric"><span>Tensor size</span><b>588 KiB</b><span>3 × 224 × 224 · float32</span></div>
+        <div class="metric"><span>Payload copies / consumer</span><b>0</b><span>zero-copy view after publish</span></div>
+      </div>
+      <div class="compare">
+        <div class="card good"><small>TenzorBus SHM</small><div class="big" id="shmCmp">0.272 ms</div><div>separate process</div></div>
+        <div class="card bad"><small>localhost HTTP + JSON</small><div class="big" id="httpCmp">2.213 ms</div><div>sender serialization excluded</div></div>
+      </div>
+      <div class="caveat">These are reference measurements, not marketing claims. Production Rust must be independently benchmarked.</div>
+    </aside>
+  </div>
+  <div class="foot">TenzorPipe → TenzorBus → local consumers · no cloud required for the transport</div>
+</div>
+<script>
+fetch('../benchmark_cross_process.json').then(r=>r.json()).then(d=>{
+  const s=d.tenzorbus_cross_process,h=d.localhost_http_json;
+  document.getElementById('shmMed').textContent=s.median_ms.toFixed(3)+' ms';
+  document.getElementById('shmP95').textContent=s.p95_ms.toFixed(3)+' ms';
+  document.getElementById('shmCmp').textContent=s.median_ms.toFixed(3)+' ms';
+  document.getElementById('httpCmp').textContent=h.median_ms.toFixed(3)+' ms';
+}).catch(()=>{});
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: core tests (clean clone)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Keep CI on the same pinned release toolchain used by final verification.
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: rustfmt,clippy
+
+      - name: Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build maturin numpy pyarrow pytest
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
+      - name: Build the workspace and the extension module
+        run: scripts/build_rust.sh
+
+      - name: Rust tests (layout parity, golden bytes, transport invariants, kill tests)
+        working-directory: rust
+        run: cargo test --release
+
+      - name: Python tests (reference + Rust bindings + TenzorPipe integration)
+        run: scripts/run_tests.sh
+
+      - name: Benchmark harness regression tests
+        run: python -m unittest tests.test_benchmark_harness -v
+
+      - name: ThreadSanitizer (clean run plus positive control)
+        run: scripts/run_tsan.sh
+
+      - name: Clippy
+        working-directory: rust
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Formatting
+        working-directory: rust
+        run: cargo fmt --all --check
+
+      - name: Dependency license policy
+        working-directory: rust
+        run: cargo deny check licenses
+
+      - name: Build Python release assets
+        run: |
+          python scripts/update_source_checksums.py --check
+          python scripts/verify_authoritative_epyc.py
+          python -m build
+
+  media-integration:
+    name: real TenzorPipe v0.3.2 integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: rustfmt,clippy
+      - run: sudo apt-get update && sudo apt-get install -y nasm ffmpeg
+      - run: pip install build maturin numpy pyarrow pytest
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      # The integration is only real if it runs the real engine. Build TenzorPipe
+      # from its v0.3.2 tag, with the direct-write patch, rather than
+      # substituting a fixture.
+      - name: Build TenzorPipe v0.3.2 with the direct-write patch
+        run: |
+          git clone --depth 1 --branch v0.3.2 https://github.com/jay-showforge/tenzorpipe /tmp/tenzorpipe
+          git -C /tmp/tenzorpipe apply "$GITHUB_WORKSPACE/patches/tenzorpipe-v0.3.2-direct-write.patch"
+          pip install /tmp/tenzorpipe
+          echo "TENZORPIPE_DIR=/tmp/tenzorpipe" >> "$GITHUB_ENV"
+          echo "TENZORPIPE_BIN=/tmp/tenzorpipe/target/release/tenzor" >> "$GITHUB_ENV"
+      # A pristine build of the same tag, so the byte-identity claim about the
+      # .tenzor path is checked rather than asserted.
+      - name: Build a pristine v0.3.2 for the byte-identity gate
+        run: |
+          git clone --depth 1 --branch v0.3.2 https://github.com/jay-showforge/tenzorpipe /tmp/tenzorpipe-pristine
+          cargo build --release --locked --manifest-path /tmp/tenzorpipe-pristine/Cargo.toml
+          echo "PRISTINE_TENZOR=/tmp/tenzorpipe-pristine/target/release/tenzor" >> "$GITHUB_ENV"
+      - run: cargo build --release --locked --manifest-path /tmp/tenzorpipe/Cargo.toml
+      - name: Build the exact release asset set
+        run: scripts/build_release_assets.sh
+      - name: Every release-candidate gate
+        env:
+          RELEASE_ASSETS_DIR: ${{ github.workspace }}/dist
+        run: scripts/verify_release_candidate.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results
+          path: |
+            release_candidate_gates.json
+            integration_soak_results.json
+            live_soak_results.json
+            tsan_results.json
+            benchmark_matrix.json
+
+  soak:
+    name: stress soaks
+    runs-on: ubuntu-latest
+    # Minutes, not seconds. Keep it off every push.
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - run: pip install numpy
+      - run: scripts/run_rust_stress.sh
+      - run: PYTHONPATH=src benchmarks/benchmark_matrix.py run --output benchmark_matrix.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stress-and-benchmark-results
+          path: |
+            stress_rust_results.json
+            benchmark_matrix.json

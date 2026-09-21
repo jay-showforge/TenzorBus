@@ -1,0 +1,29 @@
+{
+  "host": "Linux 6.6.87.2-microsoft-standard-WSL2 x86_64",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "instrumented_std": false,
+  "scope": "TSan is single-process and cannot observe cross-process access to the shared mapping; it covers the atomics and the payload memcpy they order. Cross-process behaviour is covered by tests/production_ring.rs instead.",
+  "caveat": "The stable toolchain ships a precompiled, uninstrumented std (-Zbuild-std needs nightly + rust-src). Races inside std are therefore invisible, and std's own lock-free channels raise false positives; scripts/tsan-suppressions.txt covers exactly those.",
+  "clean_run": {
+    "exit_code": 0,
+    "tests_passed": true,
+    "tsan_warnings": 0,
+    "warnings_naming_tenzorbus": 0,
+    "warning_top_frames": []
+  },
+  "positive_control": {
+    "feature": "tsan-positive-control",
+    "exit_code": 66,
+    "tsan_warnings": 4,
+    "warnings_naming_tenzorbus": 3,
+    "detected_the_injected_race": true,
+    "attempts_needed": 1,
+    "note": "Whether TSan observes a relaxed-ordering race depends on the threads interleaving inside the window, so the control is retried up to TSAN_CONTROL_ATTEMPTS times and passes on the first detection.",
+    "warning_top_frames": [
+      "tsan_threads::race_the_ring_direct::{closure#0}",
+      "tsan_threads::race_the_ring_direct::{closure#0}",
+      "tsan_threads::race_the_ring::{closure#0}",
+      "tsan_threads::race_the_ring::{closure#0}"
+    ]
+  }
+}

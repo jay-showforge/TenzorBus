@@ -110,8 +110,8 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
           set -o pipefail
-          python tests/test_live_direct_write.py -v \
-            LiveDirectWriteTests.test_native_arm64_real_tenzorpipe_to_numpy_consumer \
+          python scripts/verify_native_arm64_tenzorpipe.py \
+            --report dist-arm64/arm64-tenzorpipe-integration.json \
             2>&1 | tee dist-arm64/arm64-tenzorpipe-integration.log
           test -s dist-arm64/arm64-tenzorpipe-integration.json
 

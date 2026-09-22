@@ -119,8 +119,9 @@ strict Python tests, real TenzorPipe v0.3.2 integration, byte identity against a
 pristine build, direct-write copy accounting, negative controls, stress/soak
 gates, TSan and its positive control, and the fail-closed benchmark matrix.
 The separate ARM64 job runs the normal Rust transport suite and Python
-API/lifetime tests natively, then installs the ARM64 wheel into a clean
-environment and performs a real shared-memory roundtrip.
+API/lifetime tests natively, installs the ARM64 wheel into a clean environment,
+performs a real shared-memory roundtrip, and builds TenzorPipe v0.3.2 natively
+to verify a real direct-write TenzorPipe -> TenzorBus -> NumPy consumer flow.
 
 ```bash
 TENZORPIPE_DIR=/path/to/patched/tenzorpipe \
@@ -200,9 +201,9 @@ producer/consumer recovery.
 - Linux x86-64 and Linux ARM64 are the supported production targets for this
   alpha. Both are little-endian 64-bit targets with native 16/32/64-bit
   atomics.
-- ARM64 validation covers the Rust transport and NumPy/PyO3 API. Optional
-  PyTorch ARM64 view tests are not part of the native gate because PyTorch is
-  not installed there.
+- ARM64 validation covers the Rust transport, NumPy/PyO3 API, and the real
+  TenzorPipe v0.3.2 direct-write integration. Optional PyTorch ARM64 view tests
+  are not part of the native gate because PyTorch is not installed there.
 - The ThreadSanitizer gate remains on Linux x86-64; ARM64 receives native
   functional, process, lifecycle, and clean-wheel runtime coverage.
 - Windows/macOS transport support and the C ABI remain future work.

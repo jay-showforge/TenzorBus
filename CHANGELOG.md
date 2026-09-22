@@ -21,6 +21,9 @@ Native Linux ARM64 maintenance update.
   Python API/lifetime tests on native ARM64 hardware.
 - Added a clean-environment installed-wheel roundtrip that proves create/attach,
   zero-copy NumPy access, reserve/commit, unlink, and live-mapping behavior.
+- Added a fail-closed native ARM64 integration gate that builds TenzorPipe
+  v0.3.2 and verifies its direct-write output through TenzorBus to a NumPy
+  consumer, including shape, dtype, sequence, timestamp, payload, and cleanup.
 - Added an ARM64 `cp311-abi3-manylinux_2_34_aarch64` production wheel and made
   final release-asset verification require both native architectures.
 - Retained all Linux x86-64 CI and release-candidate gates.

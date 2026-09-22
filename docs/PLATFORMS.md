@@ -47,6 +47,13 @@ and consumer death recovery, and 64-consumer enforcement. A final installed-
 wheel smoke test performs another real shared-memory roundtrip and verifies
 that live mappings remain usable after unlink.
 
+The same native job builds the supported TenzorPipe v0.3.2 release and the
+scoped direct-write bridge on ARM64. It decodes a real H.264/AAC fixture into
+ten `[3, 224, 224]` `float32` tensors, writes them directly into TenzorBus slots,
+and verifies a separate NumPy consumer receives sequences 1 through 10 with
+source timestamps from 0 through 4.5 seconds and byte-identical payloads. The
+test also requires normal unlink cleanup and refuses a subsequent attach.
+
 ## Remaining ARM64 limitations
 
 - The native ARM64 job does not install PyTorch, so its five PyTorch-specific
@@ -55,8 +62,5 @@ that live mappings remain usable after unlink.
 - ThreadSanitizer and its positive control remain on Linux x86-64. ARM64 uses
   the same synchronization implementation and receives native functional,
   multi-process, crash-recovery, and lifecycle coverage.
-- The full patched TenzorPipe v0.3.2 integration gate remains on x86-64. This
-  release aligns TenzorBus's native target and wheel direction; it does not
-  claim an end-to-end TenzorPipe ARM64 release.
 - The authoritative performance evidence remains the accepted AMD EPYC Linux
   x86-64 run. No ARM64 benchmark was run or inferred from it.

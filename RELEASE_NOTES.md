@@ -15,6 +15,10 @@ existing Linux x86-64 behavior.
   roundtrip for the ARM64 production wheel, including create/attach,
   zero-copy NumPy aliasing, reserve/commit, unlink, and continued use of live
   mappings after unlink.
+- Built the supported TenzorPipe v0.3.2 release natively on ARM64 and verified
+  its direct-write integration with TenzorBus. A NumPy consumer received all
+  ten tensors with the expected `[3, 224, 224]` `float32` metadata, contiguous
+  sequences, source timestamps, and byte-exact payloads; cleanup also passed.
 - Added an explicit build-time platform contract: Linux, little-endian,
   64-bit pointers, and native 16/32/64-bit atomics.
 - Added release checks that require distinct x86-64 and ARM64 `cp311-abi3`
@@ -33,9 +37,10 @@ existing Linux x86-64 behavior.
 
 ## Validation scope and limitations
 
-- Native ARM64 validation covers the Rust transport and NumPy/PyO3 API.
-  PyTorch-specific ARM64 view tests are skipped because PyTorch is not installed
-  in that job; no ARM64 PyTorch claim is made by this release.
+- Native ARM64 validation covers the Rust transport, NumPy/PyO3 API, and the
+  real TenzorPipe direct-write path. PyTorch-specific ARM64 view tests are
+  skipped because PyTorch is not installed in that job; no ARM64 PyTorch claim
+  is made by this release.
 - ThreadSanitizer remains an x86-64 gate. ARM64 synchronization is covered by
   native functional, multi-process, fan-out, wraparound, crash-recovery, and
   lifecycle tests.

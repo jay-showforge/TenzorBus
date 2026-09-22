@@ -28,6 +28,10 @@ Maintenance update based on independent testing of the first alpha.
 
 - Bumped the Python and Rust package versions to `0.1.0a1` and
   `0.1.0-alpha.1` and updated the release-asset checks for the next alpha patch.
+- Made source-archive checksums use the exact normalized Git bytes placed in
+  release archives, independent of checkout line endings.
+- Pinned text suppression files to LF so the TSan gate also works from a
+  Windows-hosted checkout.
 - Carried forward the alpha.0 benchmark evidence byte-for-byte; no benchmark
   results or claims were changed.
 

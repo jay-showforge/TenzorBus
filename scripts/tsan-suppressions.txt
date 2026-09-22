@@ -1,4 +1,5 @@
 # ThreadSanitizer suppressions for the TenzorBus gate.
+# This file must remain LF-only because the sanitizer rejects CRLF entries.
 #
 # The stable Rust toolchain ships a PRECOMPILED, UNINSTRUMENTED standard library.
 # TSan therefore cannot see the synchronisation inside std and reports std's own

@@ -16,6 +16,8 @@ tester feedback without changing the transport protocol or benchmark evidence.
   behavior.
 - Corrected the README close/unlink example to match the real public API and
   documented delayed unlink, immediate unlink, and replacement semantics.
+- Hardened release verification so source-archive checksums are independent of
+  checkout line endings and TSan suppression files remain LF-only.
 
 ## Compatibility and scope
 

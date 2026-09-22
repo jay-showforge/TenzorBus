@@ -11,9 +11,9 @@ the same slot through zero-copy NumPy or PyTorch views.
 
 > Decode it once. Move it without waste.
 
-`v0.1.0-alpha.1` is a Linux-focused engineering prerelease. TenzorBus is a new,
-standalone project; TenzorPipe is an integration target, not part of this
-repository.
+`v0.1.0-alpha.2` is a Linux-focused engineering prerelease with native x86-64
+and ARM64 support. TenzorBus is a new, standalone project; TenzorPipe is an
+integration target, not part of this repository.
 
 ## What is included
 
@@ -27,6 +27,18 @@ repository.
 - Integration, negative-control, stress, soak, TSan, and transport benchmark
   harnesses.
 - Reproducible CI pinned to Rust 1.98.1.
+
+## Supported platforms
+
+| Platform | Native runtime CI | Production wheel |
+|---|---|---|
+| Linux x86-64 | Yes | `cp311-abi3-manylinux_2_34_x86_64` |
+| Linux ARM64 | Yes, on GitHub-hosted `ubuntu-24.04-arm` | `cp311-abi3-manylinux_2_34_aarch64` |
+
+Both native extensions use the Python 3.11 stable ABI and require glibc 2.34 or
+newer. The frozen protocol remains version 1 with the same byte layout on both
+architectures. See [`docs/PLATFORMS.md`](docs/PLATFORMS.md) for the architecture
+contract, native validation scope, and remaining limitations.
 
 ## Quick start
 
@@ -106,6 +118,9 @@ build, formatting, clippy with warnings denied, dependency licenses, Rust and
 strict Python tests, real TenzorPipe v0.3.2 integration, byte identity against a
 pristine build, direct-write copy accounting, negative controls, stress/soak
 gates, TSan and its positive control, and the fail-closed benchmark matrix.
+The separate ARM64 job runs the normal Rust transport suite and Python
+API/lifetime tests natively, then installs the ARM64 wheel into a clean
+environment and performs a real shared-memory roundtrip.
 
 ```bash
 TENZORPIPE_DIR=/path/to/patched/tenzorpipe \
@@ -120,12 +135,13 @@ byte-identical TenzorPipe cases plus two matching refusals, and zero corruption
 or ordering failures in stress/soak gates. See `FINAL_VERIFICATION.md` and the
 reports under the repository root for scope and evidence.
 
-## Final EPYC benchmark
+## Final EPYC x86-64 benchmark
 
 The authoritative matrix completed **49/49 cases with zero errors** on an
-**AMD EPYC 9V74, 9-vCPU Linux KVM** host. It covers TenzorBus copy, measured
-direct fill, the in-place-generation floor, Unix stream sockets, FIFOs,
-localhost HTTP binary, and HTTP JSON/base64.
+**AMD EPYC 9V74, 9-vCPU Linux x86-64 KVM** host. It covers TenzorBus copy,
+measured direct fill, the in-place-generation floor, Unix stream sockets,
+FIFOs, localhost HTTP binary, and HTTP JSON/base64. It is not ARM64 benchmark
+evidence, and alpha.2 does not change or rerun it.
 
 TenzorBus does not win every single-consumer latency or throughput metric. Its
 primary design target is shared-memory fan-out and copy scaling: one publication
@@ -181,7 +197,14 @@ producer/consumer recovery.
 
 ## Scope and limitations
 
-- Linux is the supported production target for this alpha.
+- Linux x86-64 and Linux ARM64 are the supported production targets for this
+  alpha. Both are little-endian 64-bit targets with native 16/32/64-bit
+  atomics.
+- ARM64 validation covers the Rust transport and NumPy/PyO3 API. Optional
+  PyTorch ARM64 view tests are not part of the native gate because PyTorch is
+  not installed there.
+- The ThreadSanitizer gate remains on Linux x86-64; ARM64 receives native
+  functional, process, lifecycle, and clean-wheel runtime coverage.
 - Windows/macOS transport support and the C ABI remain future work.
 - TenzorBus is local IPC infrastructure, not an inference server, model host,
   distributed cluster, or game engine.

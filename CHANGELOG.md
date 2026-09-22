@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.1.0-alpha.2 — 2026-09-21
+
+Native Linux ARM64 maintenance update.
+
+### Platform support
+
+- Added native `aarch64-unknown-linux-gnu` support alongside the existing
+  `x86_64-unknown-linux-gnu` target.
+- Kept protocol version 1 and every shared-memory layout constant unchanged.
+- Added compile-time guards for the supported Linux, little-endian, 64-bit,
+  native-atomic platform contract.
+- Audited POSIX shared memory, futex synchronization, fixed-width atomics,
+  process liveness, PyO3 buffer exports, and packaging for architecture
+  assumptions.
+
+### Native validation and packaging
+
+- Added a GitHub-hosted `ubuntu-24.04-arm` job that runs the Rust workspace and
+  Python API/lifetime tests on native ARM64 hardware.
+- Added a clean-environment installed-wheel roundtrip that proves create/attach,
+  zero-copy NumPy access, reserve/commit, unlink, and live-mapping behavior.
+- Added an ARM64 `cp311-abi3-manylinux_2_34_aarch64` production wheel and made
+  final release-asset verification require both native architectures.
+- Retained all Linux x86-64 CI and release-candidate gates.
+
+### Scope
+
+- Added unlink regression coverage shared by both native architectures.
+- Left ARM64 PyTorch-specific validation and ARM64 ThreadSanitizer outside this
+  alpha; NumPy/PyO3 runtime behavior is natively validated.
+- Did not start Windows or macOS support.
+- Preserved the authoritative AMD EPYC Linux x86-64 benchmark evidence and
+  claims without modification or rerun.
+
 ## 0.1.0-alpha.1 — 2026-09-21
 
 Maintenance update based on independent testing of the first alpha.

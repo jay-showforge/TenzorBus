@@ -263,8 +263,13 @@ class LiveDirectWriteTests(unittest.TestCase):
         import tenzorpipe as tp
 
         with tp.load(self.reference) as data:
-            first_ts = int(data[0]["video_timestamp_ms"]) * 1_000_000
-            last_ts = int(data[self.epochs - 1]["video_timestamp_ms"]) * 1_000_000
+            first_batch = data.reader.get_batch(0)
+            last_batch = data.reader.get_batch(data.reader.num_record_batches - 1)
+            first_ts = int(first_batch.column("video_timestamp_ms")[0].as_py()) * 1_000_000
+            last_ts = (
+                int(last_batch.column("video_timestamp_ms")[last_batch.num_rows - 1].as_py())
+                * 1_000_000
+            )
         self.assertEqual(report["first_timestamp_ns"], first_ts)
         self.assertEqual(report["last_timestamp_ns"], last_ts)
         self.assertEqual(cleanup["unlink_completed"], True, cleanup)

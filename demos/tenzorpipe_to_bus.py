@@ -177,6 +177,29 @@ def open_dataset(tenzor_path):
     return tp.load(tenzor_path)
 
 
+def numpy_epoch(dataset, index):
+    """Read one video epoch from TenzorPipe's Arrow file without PyTorch.
+
+    TenzorPipe exposes its Arrow reader for Arrow-only consumers. Use that
+    supported path for validation so native transport coverage does not depend
+    on the optional PyTorch extra.
+    """
+    row = index
+    for batch_index in range(dataset.reader.num_record_batches):
+        batch = dataset.reader.get_batch(batch_index)
+        if row >= batch.num_rows:
+            row -= batch.num_rows
+            continue
+        video = batch.column("video_tensor")
+        width = video.type.list_size
+        values = video.values.slice((video.offset + row) * width, width)
+        frame = values.to_numpy(zero_copy_only=True).reshape(dataset.video_shape)
+        stamps = batch.column("video_timestamp_ms")
+        timestamp_ns = int(stamps[row].as_py()) * 1_000_000
+        return frame, timestamp_ns
+    raise IndexError(index)
+
+
 def source_frames(dataset):
     """Yield (index, C-contiguous float32 frame view, media timestamp in ns).
 
@@ -251,8 +274,7 @@ def consume(args):
             # The publication order is the epoch order, so sequence N carries
             # TenzorPipe's epoch N-1. The consumer re-reads that epoch from the
             # .tenzor file itself rather than trusting the producer.
-            expected_frame = np.asarray(dataset[seq - 1]["video"])
-            expected_ts = int(dataset[seq - 1]["video_timestamp_ms"]) * 1_000_000
+            expected_frame, expected_ts = numpy_epoch(dataset, seq - 1)
 
             if args.role == "embedder":
                 view = be.lease_torch(lease)

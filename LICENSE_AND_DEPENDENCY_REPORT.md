@@ -1,4 +1,4 @@
-# Licence and dependency audit — TenzorBus v0.1.0-alpha.0
+# Licence and dependency audit — TenzorBus v0.1.0-alpha.1
 
 Audited 2026-09-20 against the release candidate tree, on the pinned toolchain
 `rustc 1.98.1 (48a229cea 2026-09-01)`.
@@ -46,9 +46,9 @@ commercial licence.
 | syn | 2.0.119 | MIT OR Apache-2.0 | via pyo3 macros |
 | target-lexicon | 0.13.5 | Apache-2.0 WITH LLVM-exception | via pyo3 build config |
 | unicode-ident | 1.0.26 | (MIT OR Apache-2.0) AND Unicode-3.0 | via syn |
-| tenzor-core | 0.1.0-alpha.0 | BUSL-1.1 | workspace |
-| tenzorbus | 0.1.0-alpha.0 | BUSL-1.1 | workspace |
-| tenzorbus-py | 0.1.0-alpha.0 | BUSL-1.1 | workspace |
+| tenzor-core | 0.1.0-alpha.1 | BUSL-1.1 | workspace |
+| tenzorbus | 0.1.0-alpha.1 | BUSL-1.1 | workspace |
+| tenzorbus-py | 0.1.0-alpha.1 | BUSL-1.1 | workspace |
 
 The runtime transport is nearly dependency-free: `tenzorbus` depends only on `libc` and the
 in-tree `tenzor-core`. Every other crate arrives through `pyo3` and exists solely for the Python
@@ -72,7 +72,7 @@ enforced by nothing. It now fails closed:
 | Check | Setting |
 |---|---|
 | Allowed licences | `MIT`, `Apache-2.0`, `Apache-2.0 WITH LLVM-exception`, `Unicode-3.0` |
-| Workspace BUSL-1.1 | pinned exceptions at `=0.1.0-alpha.0` |
+| Workspace BUSL-1.1 | pinned exceptions at `=0.1.0-alpha.1` |
 | Wildcard versions | `deny` |
 | Yanked crates | `deny` |
 | Unknown registry / git sources | `deny` |

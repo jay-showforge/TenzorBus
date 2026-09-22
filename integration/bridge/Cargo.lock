@@ -1023,7 +1023,7 @@ dependencies = [
 
 [[package]]
 name = "tenzor-core"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 
 [[package]]
 name = "tenzor-pipe"
@@ -1046,7 +1046,7 @@ dependencies = [
 
 [[package]]
 name = "tenzorbus"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "libc",
  "tenzor-core",

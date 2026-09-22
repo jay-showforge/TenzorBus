@@ -10,12 +10,12 @@ import tarfile
 import zipfile
 
 
-VERSION = "v0.1.0-alpha.0"
+VERSION = "v0.1.0-alpha.1"
 RAW_NAME = "epyc-kvm-final-benchmark-2026-09-21-complete.json"
 RAW_SHA256 = "ba86271180b80da10a1c542312b14b2a8c643713eefb728c2aa12db45771debe"
 FIXED_REQUIRED = {
-    "tenzorbus-0.1.0a0-py3-none-any.whl",
-    "tenzorbus-0.1.0a0.tar.gz",
+    "tenzorbus-0.1.0a1-py3-none-any.whl",
+    "tenzorbus-0.1.0a1.tar.gz",
     f"TenzorBus-{VERSION}-source.zip",
     f"TenzorBus-{VERSION}-source.tar.gz",
     RAW_NAME,
@@ -99,11 +99,11 @@ def main() -> int:
 
     if not FIXED_REQUIRED <= actual_files:
         fail(f"missing required assets: {sorted(FIXED_REQUIRED - actual_files)}")
-    production = sorted(directory.glob("tenzorbus_py-0.1.0a0-cp311-abi3-manylinux*_x86_64.whl"))
+    production = sorted(directory.glob("tenzorbus_py-0.1.0a1-cp311-abi3-manylinux*_x86_64.whl"))
     if len(production) != 1:
         fail(f"expected one production Linux x86-64 wheel, found {len(production)}")
 
-    with zipfile.ZipFile(directory / "tenzorbus-0.1.0a0-py3-none-any.whl") as archive:
+    with zipfile.ZipFile(directory / "tenzorbus-0.1.0a1-py3-none-any.whl") as archive:
         if archive.testzip() or not any(name.endswith("tenzorbus/ring.py") for name in archive.namelist()):
             fail("portable Python wheel is corrupt or incomplete")
     with zipfile.ZipFile(production[0]) as archive:
@@ -112,7 +112,7 @@ def main() -> int:
             fail("production wheel lacks the tenzorbus_rs shared library")
 
     verify_source_zip(directory / f"TenzorBus-{VERSION}-source.zip")
-    for name in ("tenzorbus-0.1.0a0.tar.gz", f"TenzorBus-{VERSION}-source.tar.gz"):
+    for name in ("tenzorbus-0.1.0a1.tar.gz", f"TenzorBus-{VERSION}-source.tar.gz"):
         with tarfile.open(directory / name, "r:gz") as archive:
             archive.getmembers()
     if hashlib.sha256((directory / RAW_NAME).read_bytes()).hexdigest() != RAW_SHA256:

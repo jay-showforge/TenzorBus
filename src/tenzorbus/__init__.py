@@ -7,7 +7,7 @@ from .protocol import read_u32 as _read_u32  # noqa: F401
 #: beyond this raises RingError("maximum consumer count reached").
 MAX_CONSUMERS = 64
 
-__version__ = "0.1.0a0"
+__version__ = "0.1.0a1"
 __all__ = [
     "SharedTensorRing", "TensorConsumer", "TensorLease", "PublishResult",
     "RingError", "LeaseStillBorrowed", "MAX_CONSUMERS", "RingFull", "RingTimeout",

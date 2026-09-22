@@ -11,7 +11,7 @@ the same slot through zero-copy NumPy or PyTorch views.
 
 > Decode it once. Move it without waste.
 
-`v0.1.0-alpha.0` is a Linux-focused engineering prerelease. TenzorBus is a new,
+`v0.1.0-alpha.1` is a Linux-focused engineering prerelease. TenzorBus is a new,
 standalone project; TenzorPipe is an integration target, not part of this
 repository.
 
@@ -57,8 +57,38 @@ with consumer.next() as lease:
     del frame  # exported views must not outlive the lease
 
 consumer.close()
-bus.close(unlink=True)
+del consumer
+del producer
+bus.unlink_on_close()
+del bus
 ```
+
+`Ring` does not have a `close(unlink=True)` method. `unlink_on_close()` makes
+the creator remove the shared-memory name when the last in-process ring handle
+is dropped; `keep_on_close()` disables that behavior. To remove the name
+immediately, call the module-level `tenzorbus.unlink(name)`. Existing attached
+handles remain usable until they are dropped, but new `attach(name)` calls fail
+after an unlink.
+
+### Creating an existing name
+
+`tenzorbus.create(name, ...)` fails with `RuntimeError` when `name` already
+exists. This matches the reference implementation and prevents an accidental
+second creator from silently replacing the name. Replacement must be explicit:
+
+```python
+replacement = tenzorbus.create(
+    "frames", slots=16, slot_bytes=1 << 20, force=True
+)
+```
+
+`force=True` unlinks the existing name and creates a new ring at that name.
+Already-open handles continue to refer to the old, anonymous mapping; new
+`attach("frames")` calls refer to the replacement. Coordinate replacement with
+all participating processes rather than using it as a reset while a pipeline
+is active. In particular, a live creator of the old ring must call
+`keep_on_close()` before replacement so its eventual shutdown cannot unlink the
+replacement's name.
 
 For a producer that can generate directly into the bus:
 
@@ -84,11 +114,11 @@ PRISTINE_TENZOR=/path/to/pristine/tenzorpipe/target/release/tenzor \
 scripts/verify_release_candidate.sh
 ```
 
-The accepted Linux verification recorded 47 Rust tests, 48 Python tests after
-the four benchmark-harness regressions were added, zero skips, 58 byte-identical
-TenzorPipe cases plus two matching refusals, and zero corruption or ordering
-failures in stress/soak gates. See `FINAL_VERIFICATION.md` and the reports under
-the repository root for scope and evidence.
+The alpha.0 accepted Linux verification recorded 47 Rust tests and 48 Python
+tests after the four benchmark-harness regressions were added, zero skips, 58
+byte-identical TenzorPipe cases plus two matching refusals, and zero corruption
+or ordering failures in stress/soak gates. See `FINAL_VERIFICATION.md` and the
+reports under the repository root for scope and evidence.
 
 ## Final EPYC benchmark
 

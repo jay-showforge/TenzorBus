@@ -12,6 +12,7 @@ import multiprocessing as mp
 import os
 import shutil
 import subprocess
+import sys
 import time
 import unittest
 
@@ -218,6 +219,65 @@ class RustRingTests(unittest.TestCase):
             writer.commit()
         del array
         writer.commit()
+
+    def test_direct_writer_cleanup_keeps_its_producer_alive(self):
+        """A rejected commit must remain safe through final object cleanup."""
+        script = r"""
+import gc
+import os
+import time
+
+import tenzorbus_rs as tzb
+
+name = f"pyb_cleanup_{os.getpid()}_{time.time_ns()}"
+bus = tzb.create(name, slots=2, slot_bytes=4096)
+producer = bus.producer()
+writer = producer.reserve("float32", (8,))
+view = writer.numpy()
+try:
+    writer.commit()
+except BufferError:
+    pass
+else:
+    raise AssertionError("commit unexpectedly accepted a live view")
+
+del view
+del producer
+del bus
+del writer
+gc.collect()
+"""
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(
+            proc.returncode,
+            0,
+            f"cleanup subprocess exited {proc.returncode}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}",
+        )
+
+    def test_create_existing_name_requires_explicit_force(self):
+        name = ring_name("double_create")
+        self.rings.append(name)
+        original = tzb.create(name, slots=2, slot_bytes=4096)
+        with self.assertRaises(RuntimeError):
+            tzb.create(name, slots=2, slot_bytes=4096)
+
+        # A live old creator must not unlink the replacement when it eventually
+        # drops. Replacement is a coordinated maintenance operation.
+        original.keep_on_close()
+        replacement = tzb.create(name, slots=3, slot_bytes=8192, force=True)
+        attached = tzb.attach(name)
+        self.assertEqual(original.stats()["slot_count"], 2)
+        self.assertEqual(replacement.stats()["slot_count"], 3)
+        self.assertEqual(attached.stats()["slot_count"], 3)
+        del original
+        attached_after_old_drop = tzb.attach(name)
+        self.assertEqual(attached_after_old_drop.stats()["slot_count"], 3)
 
     def test_direct_write_abort_restores_the_sequence(self):
         bus = self.make_ring("direct_abort", slots=2, slot_bytes=4096)

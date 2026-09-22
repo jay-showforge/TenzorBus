@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Build the complete unpublished v0.1.0-alpha.0 asset set from one clean commit.
+# Build the complete unpublished v0.1.0-alpha.1 asset set from one clean commit.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
-VERSION="v0.1.0-alpha.0"
+VERSION="v0.1.0-alpha.1"
 EPYC_DIR="$ROOT/evidence/epyc-benchmark"
 
 cd "$ROOT"
@@ -35,16 +35,16 @@ cp "$EPYC_DIR/epyc-kvm-final-benchmark-2026-09-21-complete.json" "$DIST/"
 cp "$EPYC_DIR/TenzorBus-Final-49-Case-Benchmark.csv" "$DIST/"
 cp "$EPYC_DIR/TenzorBus-Final-49-Case-Benchmark.md" "$DIST/"
 
-production_wheels=("$DIST"/tenzorbus_py-0.1.0a0-cp311-abi3-manylinux*_x86_64.whl)
+production_wheels=("$DIST"/tenzorbus_py-0.1.0a1-cp311-abi3-manylinux*_x86_64.whl)
 if [ "${#production_wheels[@]}" -ne 1 ] || [ ! -f "${production_wheels[0]}" ]; then
   echo "expected exactly one production Linux x86-64 tenzorbus_rs wheel" >&2
   exit 2
 fi
 
-python3 -m zipfile -t "$DIST/tenzorbus-0.1.0a0-py3-none-any.whl"
+python3 -m zipfile -t "$DIST/tenzorbus-0.1.0a1-py3-none-any.whl"
 python3 -m zipfile -t "${production_wheels[0]}"
 python3 -m zipfile -t "$DIST/TenzorBus-$VERSION-source.zip"
-tar -tzf "$DIST/tenzorbus-0.1.0a0.tar.gz" >/dev/null
+tar -tzf "$DIST/tenzorbus-0.1.0a1.tar.gz" >/dev/null
 tar -tzf "$DIST/TenzorBus-$VERSION-source.tar.gz" >/dev/null
 zipinfo -1 "${production_wheels[0]}" > "$DIST/.production-wheel-files"
 grep -q 'tenzorbus_rs.*\.so' "$DIST/.production-wheel-files"

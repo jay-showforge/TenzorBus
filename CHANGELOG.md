@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.1.0-alpha.1 — 2026-09-21
+
+Maintenance update based on independent testing of the first alpha.
+
+### Reliability
+
+- Fixed Python direct-writer destruction order so a writer always releases its
+  slot before the producer and shared-memory mapping that it borrows are
+  destroyed, including after an expected `BufferError` from committing while a
+  NumPy view is still exported.
+- Added a subprocess regression that exercises final cleanup after that expected
+  API error.
+
+### API and documentation
+
+- Changed `tenzorbus_rs.create()` to fail when the ring name already exists by
+  default; replacement now requires an explicit `force=True`.
+- Added regression coverage proving existing handles remain on the original
+  mapping while new attachments use an explicitly forced replacement, including
+  the required `keep_on_close()` coordination for a live old creator.
+- Corrected the README cleanup example to use the public
+  `unlink_on_close()`/object-lifetime API and documented immediate `unlink()`
+  behavior and name-collision semantics.
+
+### Packaging
+
+- Bumped the Python and Rust package versions to `0.1.0a1` and
+  `0.1.0-alpha.1` and updated the release-asset checks for the next alpha patch.
+- Carried forward the alpha.0 benchmark evidence byte-for-byte; no benchmark
+  results or claims were changed.
+
 ## 0.1.0-alpha.0 — 2026-09-21
 
 First standalone TenzorBus engineering prerelease.

@@ -256,8 +256,9 @@ impl PyProducer {
         // object. Python objects never move, so taking the address first and
         // holding a `Py<PyProducer>` afterwards keeps that borrow valid for as
         // long as the writer exists -- which is what lets it be widened to
-        // 'static below. Dropping the writer is what releases the slot, and the
-        // producer cannot be collected before then.
+        // 'static below. `PySlotWriter::drop` explicitly destroys the borrowed
+        // writer before this owner; ordinary field destruction order is not
+        // sufficient for this self-referential lifetime invariant.
         let address = (&slf.producer) as *const tenzorbus::Producer as usize;
         let owner: Py<PyProducer> = slf.into();
         let producer = unsafe { &*(address as *const tenzorbus::Producer) };
@@ -285,6 +286,17 @@ pub struct PySlotWriter {
     dtype: DType,
     shape: Vec<u32>,
     exports: usize,
+}
+
+impl Drop for PySlotWriter {
+    fn drop(&mut self) {
+        // `writer` contains a lifetime-widened borrow into `_producer`. Rust
+        // normally drops fields in declaration order, which would release the
+        // owner (and potentially unmap the ring) before `SlotWriter::drop`
+        // returns its reserved slot. Finish the borrow while its owner is
+        // unquestionably alive. The remaining automatic drop sees `None`.
+        drop(self.writer.take());
+    }
 }
 
 impl PySlotWriter {
@@ -682,9 +694,13 @@ impl Drop for PyLease {
 // Module
 // ---------------------------------------------------------------------------
 
-/// Create a new ring, replacing any existing object of the same name.
+/// Create a new ring.
+///
+/// By default, creation fails if `name` already exists. Pass `force=True` to
+/// unlink that name and create a replacement. Existing handles keep using the
+/// old mapping; subsequent `attach(name)` calls open the replacement.
 #[pyfunction]
-#[pyo3(signature = (name, *, slots = 8, slot_bytes = 1 << 20, force = true))]
+#[pyo3(signature = (name, *, slots = 8, slot_bytes = 1 << 20, force = false))]
 fn create(name: &str, slots: usize, slot_bytes: usize, force: bool) -> PyResult<PyRing> {
     let ring = Ring::create(
         name,

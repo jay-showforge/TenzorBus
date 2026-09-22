@@ -16,7 +16,7 @@ purpose, recorded in a commit, rather than something that happens silently.
 GPL, LGPL, AGPL, SSPL, CDDL, EPL and MPL are absent deliberately and are not authorised.
 
 `BUSL-1.1` is the project's own licence, not an allowlist entry. It is granted to the three
-workspace crates through pinned exceptions (`=0.1.0-alpha.0`) so that a version bump has to be
+workspace crates through pinned exceptions (`=0.1.0-alpha.1`) so that a version bump has to be
 made deliberately instead of being inherited by a wildcard. It never authorises a dependency.
 
 ## Current graph
@@ -39,9 +39,9 @@ made deliberately instead of being inherited by a wildcard. It never authorises 
 | syn | 2.0.119 | MIT OR Apache-2.0 |
 | target-lexicon | 0.13.5 | Apache-2.0 WITH LLVM-exception |
 | unicode-ident | 1.0.26 | (MIT OR Apache-2.0) AND Unicode-3.0 |
-| tenzor-core | 0.1.0-alpha.0 | BUSL-1.1 (workspace) |
-| tenzorbus | 0.1.0-alpha.0 | BUSL-1.1 (workspace) |
-| tenzorbus-py | 0.1.0-alpha.0 | BUSL-1.1 (workspace) |
+| tenzor-core | 0.1.0-alpha.1 | BUSL-1.1 (workspace) |
+| tenzorbus | 0.1.0-alpha.1 | BUSL-1.1 (workspace) |
+| tenzorbus-py | 0.1.0-alpha.1 | BUSL-1.1 (workspace) |
 
 The runtime surface is deliberately small. `tenzorbus` depends on `libc` and the in-tree
 `tenzor-core`; everything else in the graph arrives through `pyo3`, and only for the Python

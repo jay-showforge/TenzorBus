@@ -12,17 +12,17 @@ confidence-threshold = 0.9
 
 [[licenses.exceptions]]
 name = "tenzor-core"
-version = "=0.1.0-alpha.1"
+version = "=0.1.0-alpha.2"
 allow = ["BUSL-1.1"]
 
 [[licenses.exceptions]]
 name = "tenzorbus"
-version = "=0.1.0-alpha.1"
+version = "=0.1.0-alpha.2"
 allow = ["BUSL-1.1"]
 
 [[licenses.exceptions]]
 name = "tenzorbus-py"
-version = "=0.1.0-alpha.1"
+version = "=0.1.0-alpha.2"
 allow = ["BUSL-1.1"]
 
 [bans]

@@ -279,6 +279,25 @@ gc.collect()
         attached_after_old_drop = tzb.attach(name)
         self.assertEqual(attached_after_old_drop.stats()["slot_count"], 3)
 
+    def test_unlink_removes_the_name_without_invalidating_live_mappings(self):
+        name = ring_name("unlink")
+        self.rings.append(name)
+        creator = tzb.create(name, slots=2, slot_bytes=4096)
+        attached = tzb.attach(name)
+        producer = creator.producer()
+        consumer = attached.consumer()
+
+        tzb.unlink(name)
+        with self.assertRaises(RuntimeError):
+            tzb.attach(name)
+
+        source = np.arange(16, dtype=np.int32)
+        producer.publish(source)
+        with consumer.next(timeout=1.0) as lease:
+            view = lease.numpy()
+            np.testing.assert_array_equal(view, source)
+            del view
+
     def test_direct_write_abort_restores_the_sequence(self):
         bus = self.make_ring("direct_abort", slots=2, slot_bytes=4096)
         producer = bus.producer()

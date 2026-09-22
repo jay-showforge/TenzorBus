@@ -10,12 +10,12 @@ import tarfile
 import zipfile
 
 
-VERSION = "v0.1.0-alpha.1"
+VERSION = "v0.1.0-alpha.2"
 RAW_NAME = "epyc-kvm-final-benchmark-2026-09-21-complete.json"
 RAW_SHA256 = "ba86271180b80da10a1c542312b14b2a8c643713eefb728c2aa12db45771debe"
 FIXED_REQUIRED = {
-    "tenzorbus-0.1.0a1-py3-none-any.whl",
-    "tenzorbus-0.1.0a1.tar.gz",
+    "tenzorbus-0.1.0a2-py3-none-any.whl",
+    "tenzorbus-0.1.0a2.tar.gz",
     f"TenzorBus-{VERSION}-source.zip",
     f"TenzorBus-{VERSION}-source.tar.gz",
     RAW_NAME,
@@ -66,6 +66,11 @@ def verify_source_zip(path: pathlib.Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", type=pathlib.Path)
+    parser.add_argument(
+        "--required-native-arches",
+        default="x86_64,aarch64",
+        help="comma-separated native wheel architectures required in this set",
+    )
     args = parser.parse_args()
     directory = args.directory.resolve()
     if not directory.is_dir():
@@ -99,20 +104,38 @@ def main() -> int:
 
     if not FIXED_REQUIRED <= actual_files:
         fail(f"missing required assets: {sorted(FIXED_REQUIRED - actual_files)}")
-    production = sorted(directory.glob("tenzorbus_py-0.1.0a1-cp311-abi3-manylinux*_x86_64.whl"))
-    if len(production) != 1:
-        fail(f"expected one production Linux x86-64 wheel, found {len(production)}")
+    allowed_arches = {"x86_64", "aarch64"}
+    required_arches = {
+        value.strip()
+        for value in args.required_native_arches.split(",")
+        if value.strip()
+    }
+    if not required_arches or not required_arches <= allowed_arches:
+        fail(f"invalid required native architectures: {sorted(required_arches)}")
+    production: list[pathlib.Path] = []
+    for arch in sorted(required_arches):
+        matches = sorted(
+            directory.glob(
+                f"tenzorbus_py-0.1.0a2-cp311-abi3-manylinux_2_34_{arch}.whl"
+            )
+        )
+        if len(matches) != 1:
+            fail(f"expected one production Linux {arch} wheel, found {len(matches)}")
+        production.extend(matches)
 
-    with zipfile.ZipFile(directory / "tenzorbus-0.1.0a1-py3-none-any.whl") as archive:
+    with zipfile.ZipFile(directory / "tenzorbus-0.1.0a2-py3-none-any.whl") as archive:
         if archive.testzip() or not any(name.endswith("tenzorbus/ring.py") for name in archive.namelist()):
             fail("portable Python wheel is corrupt or incomplete")
-    with zipfile.ZipFile(production[0]) as archive:
-        names = archive.namelist()
-        if archive.testzip() or not any("tenzorbus_rs" in name and name.endswith(".so") for name in names):
-            fail("production wheel lacks the tenzorbus_rs shared library")
+    for wheel in production:
+        with zipfile.ZipFile(wheel) as archive:
+            names = archive.namelist()
+            if archive.testzip() or not any(
+                "tenzorbus_rs" in name and name.endswith(".so") for name in names
+            ):
+                fail(f"production wheel lacks the tenzorbus_rs shared library: {wheel.name}")
 
     verify_source_zip(directory / f"TenzorBus-{VERSION}-source.zip")
-    for name in ("tenzorbus-0.1.0a1.tar.gz", f"TenzorBus-{VERSION}-source.tar.gz"):
+    for name in ("tenzorbus-0.1.0a2.tar.gz", f"TenzorBus-{VERSION}-source.tar.gz"):
         with tarfile.open(directory / name, "r:gz") as archive:
             archive.getmembers()
     if hashlib.sha256((directory / RAW_NAME).read_bytes()).hexdigest() != RAW_SHA256:

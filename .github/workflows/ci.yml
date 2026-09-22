@@ -67,6 +67,39 @@ jobs:
           python scripts/verify_authoritative_epyc.py
           python -m build
 
+  arm64-native:
+    name: native Linux ARM64 runtime and wheel
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@1.98.1
+
+      - name: Python build and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build maturin numpy
+
+      - name: Native Rust, Python API/lifetime, and clean-wheel validation
+        run: bash scripts/run_native_arm64_validation.sh
+
+      - name: Upload the runtime-validated ARM64 wheel and results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-arm64-wheel
+          if-no-files-found: error
+          path: |
+            dist-arm64/tenzorbus_py-0.1.0a2-cp311-abi3-manylinux_2_34_aarch64.whl
+            dist-arm64/ARM64_SHA256SUMS
+            dist-arm64/arm64-validation.json
+            dist-arm64/arm64-unittest.log
+
   media-integration:
     name: real TenzorPipe v0.3.2 integration
     runs-on: ubuntu-latest
@@ -108,6 +141,9 @@ jobs:
       - name: Every release-candidate gate
         env:
           RELEASE_ASSETS_DIR: ${{ github.workspace }}/dist
+          # This native x86-64 job validates its own wheel. The separately
+          # required arm64-native job builds and runs the ARM64 wheel on ARM64.
+          RELEASE_WHEEL_ARCHES: x86_64
         run: scripts/verify_release_candidate.sh
       - uses: actions/upload-artifact@v4
         if: always()

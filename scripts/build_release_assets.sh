@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Build the complete unpublished v0.1.0-alpha.1 asset set from one clean commit.
+# Build the complete unpublished v0.1.0-alpha.2 asset set from one clean commit.
+#
+# The native x86-64 wheel is built here. ARM64_WHEEL must name the wheel built
+# and runtime-tested on a native Linux ARM64 host; a cross-compiled wheel is not
+# accepted as release evidence.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
-VERSION="v0.1.0-alpha.1"
+VERSION="v0.1.0-alpha.2"
 EPYC_DIR="$ROOT/evidence/epyc-benchmark"
+ARM64_WHEEL="${ARM64_WHEEL:-}"
 
 cd "$ROOT"
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
@@ -23,8 +28,24 @@ mkdir -p "$DIST"
 python3 -m build --outdir "$DIST" "$ROOT"
 (
   cd "$ROOT/rust/tenzorbus-py"
-  python3 -m maturin build --release --locked --out "$DIST"
+  python3 -m maturin build --release --locked \
+    --compatibility manylinux_2_34 --out "$DIST"
 )
+
+if [ -n "$ARM64_WHEEL" ]; then
+  if [ ! -f "$ARM64_WHEEL" ]; then
+    echo "ARM64_WHEEL does not exist: $ARM64_WHEEL" >&2
+    exit 2
+  fi
+  case "$(basename "$ARM64_WHEEL")" in
+    tenzorbus_py-0.1.0a2-cp311-abi3-manylinux_2_34_aarch64.whl) ;;
+    *)
+      echo "unexpected ARM64 wheel name: $(basename "$ARM64_WHEEL")" >&2
+      exit 2
+      ;;
+  esac
+  cp "$ARM64_WHEEL" "$DIST/"
+fi
 
 git archive --format=zip --prefix="TenzorBus-$VERSION/" \
   --output="$DIST/TenzorBus-$VERSION-source.zip" HEAD
@@ -35,24 +56,32 @@ cp "$EPYC_DIR/epyc-kvm-final-benchmark-2026-09-21-complete.json" "$DIST/"
 cp "$EPYC_DIR/TenzorBus-Final-49-Case-Benchmark.csv" "$DIST/"
 cp "$EPYC_DIR/TenzorBus-Final-49-Case-Benchmark.md" "$DIST/"
 
-production_wheels=("$DIST"/tenzorbus_py-0.1.0a1-cp311-abi3-manylinux*_x86_64.whl)
+production_wheels=("$DIST"/tenzorbus_py-0.1.0a2-cp311-abi3-manylinux_2_34_x86_64.whl)
 if [ "${#production_wheels[@]}" -ne 1 ] || [ ! -f "${production_wheels[0]}" ]; then
   echo "expected exactly one production Linux x86-64 tenzorbus_rs wheel" >&2
   exit 2
 fi
 
-python3 -m zipfile -t "$DIST/tenzorbus-0.1.0a1-py3-none-any.whl"
+python3 -m zipfile -t "$DIST/tenzorbus-0.1.0a2-py3-none-any.whl"
 python3 -m zipfile -t "${production_wheels[0]}"
+if [ -n "$ARM64_WHEEL" ]; then
+  python3 -m zipfile -t "$DIST/$(basename "$ARM64_WHEEL")"
+fi
 python3 -m zipfile -t "$DIST/TenzorBus-$VERSION-source.zip"
-tar -tzf "$DIST/tenzorbus-0.1.0a1.tar.gz" >/dev/null
+tar -tzf "$DIST/tenzorbus-0.1.0a2.tar.gz" >/dev/null
 tar -tzf "$DIST/TenzorBus-$VERSION-source.tar.gz" >/dev/null
 zipinfo -1 "${production_wheels[0]}" > "$DIST/.production-wheel-files"
 grep -q 'tenzorbus_rs.*\.so' "$DIST/.production-wheel-files"
+if [ -n "$ARM64_WHEEL" ]; then
+  zipinfo -1 "$DIST/$(basename "$ARM64_WHEEL")" > "$DIST/.arm64-wheel-files"
+  grep -q 'tenzorbus_rs.*\.so' "$DIST/.arm64-wheel-files"
+fi
 zipinfo -1 "$DIST/TenzorBus-$VERSION-source.zip" > "$DIST/.source-zip-files"
 grep -q '/SOURCE_SHA256SUMS$' "$DIST/.source-zip-files"
 grep -q '/evidence/epyc-benchmark/epyc-kvm-final-benchmark-2026-09-21-complete.json$' \
   "$DIST/.source-zip-files"
-rm -f "$DIST/.production-wheel-files" "$DIST/.source-zip-files"
+rm -f "$DIST/.production-wheel-files" "$DIST/.arm64-wheel-files" \
+  "$DIST/.source-zip-files"
 
 (
   cd "$DIST"

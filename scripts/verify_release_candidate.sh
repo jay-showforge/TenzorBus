@@ -66,7 +66,8 @@ gate "authoritative EPYC evidence" env -C "$ROOT" \
   python3 scripts/verify_authoritative_epyc.py
 if [ -n "${RELEASE_ASSETS_DIR:-}" ] && [ -d "$RELEASE_ASSETS_DIR" ]; then
   gate "release artifact set" env -C "$ROOT" \
-    python3 scripts/verify_release_assets.py "$RELEASE_ASSETS_DIR"
+    python3 scripts/verify_release_assets.py "$RELEASE_ASSETS_DIR" \
+      --required-native-arches "${RELEASE_WHEEL_ARCHES:-x86_64,aarch64}"
 else
   record "release artifact set" FAIL "set RELEASE_ASSETS_DIR to the exact publishable assets"
 fi

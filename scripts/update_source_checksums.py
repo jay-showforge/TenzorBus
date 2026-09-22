@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Write or verify SOURCE_SHA256SUMS for every publishable source file."""
+"""Write or verify SOURCE_SHA256SUMS for every publishable source file.
+
+For a Git checkout, hashes come from the index: those are the normalized bytes
+that ``git archive`` puts in release source bundles. This avoids platform
+checkout line endings making an otherwise valid archive fail verification.
+"""
 
 from __future__ import annotations
 
@@ -64,9 +69,18 @@ def include(path: pathlib.Path) -> bool:
 
 def digest(path: pathlib.Path) -> str:
     value = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            value.update(block)
+    if (ROOT / ".git").exists():
+        rel = path.relative_to(ROOT).as_posix()
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "show", f":{rel}"],
+            capture_output=True,
+            check=True,
+        )
+        value.update(result.stdout)
+    else:
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                value.update(block)
     return value.hexdigest()
 
 

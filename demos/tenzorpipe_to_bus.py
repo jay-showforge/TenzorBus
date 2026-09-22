@@ -226,6 +226,10 @@ def consume(args):
         "lease_violations": 0,
         "first_sequence": None,
         "last_sequence": None,
+        "first_timestamp_ns": None,
+        "last_timestamp_ns": None,
+        "observed_shape": None,
+        "observed_dtype": None,
         # (sequence, slot) as observed by this consumer, so a harness can prove
         # the slot it read is the slot the producer wrote into.
         "slots": [],
@@ -282,6 +286,12 @@ def consume(args):
                 report["content_mismatches"] += 1
             if info["timestamp_ns"] != expected_ts:
                 report["timestamp_mismatches"] += 1
+
+            if report["received"] == 0:
+                report["first_timestamp_ns"] = info["timestamp_ns"]
+                report["observed_shape"] = list(shape)
+                report["observed_dtype"] = dtype
+            report["last_timestamp_ns"] = info["timestamp_ns"]
 
             if previous is None:
                 report["first_sequence"] = seq

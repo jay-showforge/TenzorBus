@@ -85,10 +85,33 @@ jobs:
       - name: Python build and test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build maturin numpy
+          pip install build maturin numpy pyarrow
+
+      - name: Native TenzorPipe build dependencies
+        run: sudo apt-get update && sudo apt-get install -y nasm ffmpeg
 
       - name: Native Rust, Python API/lifetime, and clean-wheel validation
         run: bash scripts/run_native_arm64_validation.sh
+
+      - name: Build supported TenzorPipe v0.3.2 natively
+        run: |
+          git clone --depth 1 --branch v0.3.2 https://github.com/jay-showforge/tenzorpipe /tmp/tenzorpipe-arm64
+          git -C /tmp/tenzorpipe-arm64 apply "$GITHUB_WORKSPACE/patches/tenzorpipe-v0.3.2-direct-write.patch"
+          pip install /tmp/tenzorpipe-arm64
+          cargo build --release --locked --manifest-path /tmp/tenzorpipe-arm64/Cargo.toml
+          TENZORPIPE_DIR=/tmp/tenzorpipe-arm64 scripts/build_bridge.sh
+          scripts/build_rust.sh
+
+      - name: Real TenzorPipe to TenzorBus to consumer flow on ARM64
+        env:
+          TENZORBUS_NATIVE_ARM64_TENZORPIPE: "1"
+          TENZORBUS_NATIVE_ARM64_TENZORPIPE_REPORT: ${{ github.workspace }}/dist-arm64/arm64-tenzorpipe-integration.json
+          TENZORPIPE_BIN: /tmp/tenzorpipe-arm64/target/release/tenzor
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          python tests/test_live_direct_write.py -v \
+            LiveDirectWriteTests.test_native_arm64_real_tenzorpipe_to_numpy_consumer \
+            2>&1 | tee dist-arm64/arm64-tenzorpipe-integration.log
 
       - name: Upload the runtime-validated ARM64 wheel and results
         uses: actions/upload-artifact@v4
@@ -100,6 +123,8 @@ jobs:
             dist-arm64/ARM64_SHA256SUMS
             dist-arm64/arm64-validation.json
             dist-arm64/arm64-unittest.log
+            dist-arm64/arm64-tenzorpipe-integration.json
+            dist-arm64/arm64-tenzorpipe-integration.log
 
   media-integration:
     name: real TenzorPipe v0.3.2 integration

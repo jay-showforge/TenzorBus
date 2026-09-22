@@ -28,6 +28,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -124,7 +125,7 @@ class LiveDirectWriteTests(unittest.TestCase):
         cls.work.cleanup()
 
     def run_live(self, consumers=3, slots=8, extra_ingest=(), sleep_max_ms=0.0,
-                 die_after=0, timeout=300):
+                 die_after=0, timeout=300, verify_cleanup=False):
         """Start consumers, stream through the bridge, return (bridge, [consumers])."""
         ring = f"live_{os.getpid()}_{time.monotonic_ns() % 1_000_000}"
         env = env_with_src()
@@ -163,16 +164,26 @@ class LiveDirectWriteTests(unittest.TestCase):
             report["exit_code"] = child.returncode
             reports.append(report)
 
+        cleanup = {"unlink_completed": False, "attach_after_unlink_refused": False}
         try:
             import tenzorbus_rs as tb
 
             tb.unlink(ring)
-        except Exception:
-            pass
+            cleanup["unlink_completed"] = True
+            try:
+                reopened = tb.attach(ring)
+            except Exception:
+                cleanup["attach_after_unlink_refused"] = True
+            else:
+                reopened.close()
+        except Exception as exc:
+            cleanup["error"] = f"{type(exc).__name__}: {exc}"
 
         bridge = last_json(ingest.stdout) or {}
         bridge["exit_code"] = ingest.returncode
         bridge["stderr_tail"] = ingest.stderr[-1500:]
+        if verify_cleanup:
+            return bridge, reports, cleanup
         return bridge, reports
 
     def assert_consumer_clean(self, report, expect_slots):
@@ -219,6 +230,56 @@ class LiveDirectWriteTests(unittest.TestCase):
         numpy_views = sum(r["zero_copy_numpy"] for r in reports)
         self.assertEqual(torch_views, self.epochs)
         self.assertEqual(numpy_views, 2 * self.epochs)
+
+    @unittest.skipUnless(
+        os.environ.get("TENZORBUS_NATIVE_ARM64_TENZORPIPE") == "1",
+        "set TENZORBUS_NATIVE_ARM64_TENZORPIPE=1 on the native ARM64 gate",
+    )
+    def test_native_arm64_real_tenzorpipe_to_numpy_consumer(self):
+        """Real ARM64 engine -> direct-write bridge -> NumPy consumer."""
+        self.assertEqual(platform.system(), "Linux")
+        self.assertEqual(platform.machine(), "aarch64")
+
+        bridge, reports, cleanup = self.run_live(
+            consumers=1, slots=4, verify_cleanup=True
+        )
+        self.assertEqual(bridge.get("exit_code"), 0, bridge)
+        self.assertEqual(bridge["mode"], "direct")
+        self.assertEqual(bridge["epochs"], self.epochs)
+        self.assertEqual(bridge["published"], self.epochs)
+        self.assertEqual(bridge["destinations_taken"], self.epochs)
+        self.assertEqual(bridge["producer_copies"], 0)
+        self.assertEqual(bridge["frame_bytes"], 3 * 224 * 224 * 4)
+
+        self.assertEqual(len(reports), 1)
+        report = reports[0]
+        expect_slots = {tuple(pair) for pair in bridge["slot_trace"]}
+        self.assert_consumer_clean(report, expect_slots)
+        self.assertEqual(report["observed_shape"], [3, 224, 224])
+        self.assertEqual(report["observed_dtype"], "float32")
+        self.assertEqual(report["zero_copy_numpy"], self.epochs)
+        self.assertEqual(report["zero_copy_torch"], 0)
+
+        import tenzorpipe as tp
+
+        with tp.load(self.reference) as data:
+            first_ts = int(data[0]["video_timestamp_ms"]) * 1_000_000
+            last_ts = int(data[self.epochs - 1]["video_timestamp_ms"]) * 1_000_000
+        self.assertEqual(report["first_timestamp_ns"], first_ts)
+        self.assertEqual(report["last_timestamp_ns"], last_ts)
+        self.assertEqual(cleanup["unlink_completed"], True, cleanup)
+        self.assertEqual(cleanup["attach_after_unlink_refused"], True, cleanup)
+
+        report_path = os.environ.get("TENZORBUS_NATIVE_ARM64_TENZORPIPE_REPORT")
+        if report_path:
+            Path(report_path).write_text(
+                json.dumps(
+                    {"bridge": bridge, "consumer": report, "cleanup": cleanup},
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
 
     def test_the_copy_path_delivers_the_same_tensors(self):
         """Declining the destination must change nothing a consumer can see."""
